@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Send to SkyCut D24 (No Markers)</name>
+  <id>skycut.send.no.markers</id>
+
+  <param name="help" type="description">
+    ✅ WORKFLOW:
+    1. Create paths in a layer named exactly 'Cut'
+    2. The P0 tool will automatically be placed at the bottom-right corner of the bounding box of all paths
+    3. Run this extension
+    4. Machine cuts from that point
+
+    • Black = P0 (creasing) → first
+    • Other colors = P1 (cutting) → middle
+    • Red = P1 (outer contour) → last
+  </param>
+
+  <param name="ip" type="string" gui-text="IP address" visible="not(save_hpgl)">192.168.0.233</param>
+  <param name="port" type="int" min="1" max="65535" gui-text="Port" visible="not(save_hpgl)">8080</param>
+  <param name="knife_offset_mm" type="float" min="0.0" max="1.0" precision="2" gui-text="Knife offset (mm)">0.10</param>
+  <param name="overcut_mm" type="float" min="0.0" max="2.0" precision="2" gui-text="Overcut (mm)">0.60</param>
+
+  <param name="save_hpgl" type="bool" gui-text="💾 Save HP-GL file instead of sending">false</param>
+  <param name="output_path" type="string" gui-text="Output path" visible="save_hpgl">skycut_output.hpgl</param>
+
+  <effect>
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="SkyCutD24 Tools"/>
+    </effects-menu>
+  </effect>
+
+  <script>
+    <command reldir="extensions" interpreter="python">send_no_markers.py</command>
+  </script>
+</inkscape-extension>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>Corner Markers (L-shaped)</name>
+  <id>corner.markers.bg</id>
+
+  <param name="help" type="description">HOW TO USE THIS EXTENSION:
+• Select all objects in your „Cut“ layer that you want to surround with markers.
+• Run this command (Extensions → SkyCutD24 Tools → Corner Markers).
+• The extension will create or update a „Mark“ layer with 4 L-shaped markers.
+• Markers are placed at the specified „Offset“ from the bounding box of the selection.
+• Then use „Send to SkyCut D24“ to cut.</param>
+
+  <param name="offset_mm" type="float" min="0" max="100" gui-text="Offset (mm)">
+    5.0
+  </param>
+
+  <effect>
+    <object-type>path</object-type>
+    <effects-menu>
+      <submenu name="SkyCutD24 Tools"/>
+    </effects-menu>
+  </effect>
+
+  <script>
+    <command reldir="extensions" interpreter="python">corner_markers.py</command>
+  </script>
+</inkscape-extension>
