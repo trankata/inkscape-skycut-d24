@@ -2,24 +2,11 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # Corner Markers (L-shaped) – Inkscape extension
-# Copyright (C) 2025 Anton Kutrubiev
 #
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
-# the Free Software Foundation, either version 3 of the License, or
-# (at your option) any later version.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-# See the GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program. If not, see <https://www.gnu.org/licenses/>.
-
 
 import inkex
-from inkex import PathElement, Layer, Style
+from inkex import PathElement, Layer, Style, Transform, Group
+
 
 class CornerMarkers(inkex.EffectExtension):
 
@@ -33,6 +20,12 @@ class CornerMarkers(inkex.EffectExtension):
         if not selection:
             inkex.errormsg("No objects selected")
             return
+
+        # =========================================================
+        # APPLY TRANSFORMS (ИСТИНСКО!)
+        # =========================================================
+        for el in selection.values():
+            self._apply_recursive(el)
 
         # ---------- PARAMETERS ----------
         offset = svg.unittouu(f"{self.options.offset_mm}mm")
@@ -56,6 +49,9 @@ class CornerMarkers(inkex.EffectExtension):
         if mark_layer is None:
             mark_layer = Layer.new("Mark")
             svg.add(mark_layer)
+
+        # 🔒 LOCK MARK LAYER
+        mark_layer.set("sodipodi:insensitive", "true")
 
         style = Style({
             "stroke": "#000000",
@@ -82,5 +78,25 @@ class CornerMarkers(inkex.EffectExtension):
             path.style = style
             mark_layer.add(path)
 
+    # =========================================================
+    # APPLY TRANSFORM RECURSIVELY (ПРАВИЛНО)
+    # =========================================================
+    def _apply_recursive(self, el):
+        # Ако е група с transform → изпичаме го в децата
+        if isinstance(el, Group) and el.transform:
+            t = el.transform
+            for child in el:
+                child.transform = t @ child.transform
+            el.transform = Transform()
+
+        # Ако е обект → директно apply
+        if hasattr(el, "apply_transform"):
+            el.apply_transform()
+
+        for child in el:
+            self._apply_recursive(child)
+
+
 if __name__ == "__main__":
     CornerMarkers().run()
+
