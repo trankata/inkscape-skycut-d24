@@ -52,4 +52,3 @@ GNU General Public License v3.0 or later
 ---
 
 **Author:** Anton Kutrubiev (Bulgaria)  
-**Contact:** trankata@gmail.com
