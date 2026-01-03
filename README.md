@@ -2,7 +2,7 @@
 
 This Inkscape extension allows sending cutting jobs directly to a **SkyCut D24** plotter over **Wi-Fi (WLAN)**, bypassing the original Windows-only software. It provides a **Linux-compatible workflow** without requiring the proprietary software.
 
-> ⚠️ **Note:** This extension currently works only over Wi-Fi. USB or wired serial connections are not supported yet. Contributions for improvements, bug fixes, or USB support are welcome.
+> ⚠️ **Note:** I am not a programmer. I created this extension out of necessity, due to the lack of Linux support for SkyCut D24, with the help of AI. This extension currently works only over Wi-Fi. USB or wired serial connections are not supported yet. Contributions for improvements, bug fixes, or USB support are welcome.
 
 ---
 
