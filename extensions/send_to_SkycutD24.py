@@ -43,11 +43,8 @@ def is_path_closed(points, tolerance=0.01):
     """Проверява дали пътеката е затворена."""
     if len(points) < 3:
         return False
-    
-    # Проверка първа/последна точка
     first_x, first_y = points[0]
     last_x, last_y = points[-1]
-    
     return (abs(first_x - last_x) < tolerance and 
             abs(first_y - last_y) < tolerance)
 
@@ -60,12 +57,9 @@ def create_real_overcut(points, overcut_mm):
     if overcut_mm <= 0 or len(points) < 3:
         return points
     
-    # Проверяваме дали пътят е затворен
     if not is_path_closed(points):
-        # Ако не е затворен, връщаме както е
         return points
     
-    # 1. Изчисляваме дължината на пътя (без последната точка, която е същата като първата)
     total_length = 0.0
     segment_lengths = []
     
@@ -79,27 +73,22 @@ def create_real_overcut(points, overcut_mm):
     if total_length == 0:
         return points
     
-    # 2. Намираме колко и къде да повторим
     remaining_overcut = overcut_mm
     overcut_points = []
     
-    # Започваме от втората точка (първата вече я имаме в края)
     for i in range(1, len(points) - 1):
         if remaining_overcut <= 0:
             break
             
-        # Индекси: i-1 → i (сегментът който ще повторим)
         x1, y1 = points[i-1]
         x2, y2 = points[i]
         
         segment_length = segment_lengths[i-1]
         
         if remaining_overcut >= segment_length:
-            # Добавяме цялата точка
             overcut_points.append((x2, y2))
             remaining_overcut -= segment_length
         else:
-            # Изчисляваме къде точно да спрем
             ratio = remaining_overcut / segment_length
             stop_x = x1 + (x2 - x1) * ratio
             stop_y = y1 + (y2 - y1) * ratio
@@ -107,7 +96,6 @@ def create_real_overcut(points, overcut_mm):
             remaining_overcut = 0
             break
     
-    # 3. Връщаме оригиналния път + overcut точките
     return points + overcut_points
 
 class SendToSkyCutD24(inkex.EffectExtension):
@@ -119,14 +107,13 @@ class SendToSkyCutD24(inkex.EffectExtension):
         pars.add_argument("--ip", type=str, default="192.168.0.233")
         pars.add_argument("--port", type=int, default=8080)
         pars.add_argument("--knife_offset_mm", type=float, default=0.30)
-        pars.add_argument("--overcut_mm", type=float, default=0.30)  # Overcut за P1
+        pars.add_argument("--overcut_mm", type=float, default=0.30)
 
     def effect(self):
         svg = self.svg
         knife_offset_mm = self.options.knife_offset_mm
         overcut_mm = self.options.overcut_mm
 
-        # === ИЗБОР НА РАЗМЕР НА МЕДИЯТА ===
         paper_sizes = {
             'a4p': (210.0, 297.0),
             'a4l': (297.0, 210.0),
@@ -135,7 +122,6 @@ class SendToSkyCutD24(inkex.EffectExtension):
         }
         page_width_mm, page_height_mm = paper_sizes.get(self.options.paper_size, (210.0, 297.0))
 
-        # === Мащаб от viewBox към mm ===
         viewbox = svg.get('viewBox')
         if viewbox:
             vb_vals = list(map(float, viewbox.split()))
@@ -162,6 +148,10 @@ class SendToSkyCutD24(inkex.EffectExtension):
         marker_points = []
         for elem in mark_layer.iterdescendants():
             if isinstance(elem, PathElement):
+                # ПРОМЯНА ТУК: Игнорираме триъгълника
+                if elem.get('data-type') == 'triangle':
+                    continue  # Пропускаме триъгълника!
+                    
                 path = elem.path.to_absolute()
                 for seg in path:
                     if hasattr(seg, 'x') and hasattr(seg, 'y'):
@@ -210,11 +200,6 @@ class SendToSkyCutD24(inkex.EffectExtension):
             if isinstance(elem, PathElement):
                 color = elem.style.get('stroke', '#000000').lower()
                 
-                # ЛОГИКА ЗА ИНСТРУМЕНТИ:
-                # ЧЕРНО → P0 (ЛЯВ инструмент) → БИГОВАНЕ → НЯМА overcut
-                # ВСИЧКО ДРУГО → P1 (ДЕСЕН инструмент) → РЯЗАНЕ → ИМА overcut
-                
-                # Прецизна проверка за черно
                 is_black = False
                 if color in ('#000000', 'black', '#000', 'rgb(0,0,0)', 'rgb(0, 0, 0)'):
                     is_black = True
@@ -226,12 +211,10 @@ class SendToSkyCutD24(inkex.EffectExtension):
                     is_black = True
                 
                 if is_black:
-                    # ЛЯВ инструмент (P0) - БИГОВАНЕ
                     tool = "P0"
                     priority = 0
                     has_overcut = False
                 else:
-                    # ДЕСЕН инструмент (P1) - РЯЗАНЕ
                     tool = "P1"
                     priority = 1
                     has_overcut = True
@@ -247,7 +230,6 @@ class SendToSkyCutD24(inkex.EffectExtension):
             inkex.errormsg("❌ Няма пътища в слой 'Cut'!")
             return
 
-        # Сортираме: първо биговане (P0), после рязане (P1)
         path_data.sort(key=lambda x: x['priority'])
 
         # === Генериране на HP-GL ===
@@ -269,7 +251,6 @@ class SendToSkyCutD24(inkex.EffectExtension):
                 hpgl.append(f"{tool};")
                 current_tool = tool
 
-            # Генерираме всички точки от пътя в mm
             all_points_mm = []
             csp = CubicSuperPath(path_info['path'].to_absolute())
             
@@ -296,14 +277,11 @@ class SendToSkyCutD24(inkex.EffectExtension):
 
                     prev = p1
 
-            # === ПРИЛАГАМЕ OVERCUT САМО ЗА P1 (РЯЗАНЕ) ===
             if has_overcut and overcut_mm > 0:
                 all_points_mm = create_real_overcut(all_points_mm, overcut_mm)
 
-            # === Преобразуваме точките в HP-GL команди ===
             first_point = None
             for x_orig, y_orig in all_points_mm:
-                # Добавяме отместване на ножа САМО за P1
                 if tool == "P1":
                     x_orig += knife_offset_mm
 
@@ -325,7 +303,6 @@ class SendToSkyCutD24(inkex.EffectExtension):
         hpgl.extend(["U0,0;", "@;", "@;"])
         hpgl_text = "\n".join(hpgl)
 
-        # === Запазване или изпращане ===
         if self.options.save_hpgl:
             output_path = self.options.output_path.strip()
             if not output_path:
