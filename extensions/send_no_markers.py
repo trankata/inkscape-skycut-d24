@@ -34,25 +34,73 @@ def cubic_point(p0, c1, c2, p1, t):
         mt*mt*mt*p0[1] + 3*mt*mt*t*c1[1] + 3*mt*t*t*c2[1] + t*t*t*p1[1]
     )
 
-def extend_path_for_overcut(points, overcut_mm):
-    if overcut_mm <= 0 or len(points) < 2:
+def is_path_closed(points, tolerance=0.01):
+    """Проверява дали пътеката е затворена."""
+    if len(points) < 3:
+        return False
+    first_x, first_y = points[0]
+    last_x, last_y = points[-1]
+    return (abs(first_x - last_x) < tolerance and 
+            abs(first_y - last_y) < tolerance)
+
+def create_real_overcut(points, overcut_mm):
+    """
+    Създава истински overcut: повтаря част от пътя.
+    Машината тръгва от първата точка, затваря контура,
+    после тръгва да повтаря същия път и спира след overcut_mm.
+    """
+    if overcut_mm <= 0 or len(points) < 3:
         return points
-    first = points[0]
-    last = points[-1]
-    if abs(first[0] - last[0]) < 0.01 and abs(first[1] - last[1]) < 0.01:
-        if len(points) >= 2:
-            p_prev = points[-2]
-            p_last = points[-1]
-            dx = p_last[0] - p_prev[0]
-            dy = p_last[1] - p_prev[1]
-            length = math.hypot(dx, dy)
-            if length > 0.001:
-                dx_norm = dx / length
-                dy_norm = dy / length
-                overcut_x = p_last[0] + dx_norm * overcut_mm
-                overcut_y = p_last[1] + dy_norm * overcut_mm
-                return points + [(overcut_x, overcut_y)]
-    return points
+    
+    # Проверяваме дали пътят е затворен
+    if not is_path_closed(points):
+        # Ако не е затворен, връщаме както е
+        return points
+    
+    # 1. Изчисляваме дължината на пътя (без последната точка, която е същата като първата)
+    total_length = 0.0
+    segment_lengths = []
+    
+    for i in range(len(points) - 1):
+        x1, y1 = points[i]
+        x2, y2 = points[i + 1]
+        length = math.hypot(x2 - x1, y2 - y1)
+        segment_lengths.append(length)
+        total_length += length
+    
+    if total_length == 0:
+        return points
+    
+    # 2. Намираме колко и къде да повторим
+    remaining_overcut = overcut_mm
+    overcut_points = []
+    
+    # Започваме от втората точка (първата вече я имаме в края)
+    for i in range(1, len(points) - 1):
+        if remaining_overcut <= 0:
+            break
+            
+        # Индекси: i-1 → i (сегментът който ще повторим)
+        x1, y1 = points[i-1]
+        x2, y2 = points[i]
+        
+        segment_length = segment_lengths[i-1]
+        
+        if remaining_overcut >= segment_length:
+            # Добавяме цялата точка
+            overcut_points.append((x2, y2))
+            remaining_overcut -= segment_length
+        else:
+            # Изчисляваме къде точно да спрем
+            ratio = remaining_overcut / segment_length
+            stop_x = x1 + (x2 - x1) * ratio
+            stop_y = y1 + (y2 - y1) * ratio
+            overcut_points.append((stop_x, stop_y))
+            remaining_overcut = 0
+            break
+    
+    # 3. Връщаме оригиналния път + overcut точките
+    return points + overcut_points
 
 class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
 
@@ -82,13 +130,36 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
         for elem in cut_layer.iterdescendants():
             if isinstance(elem, PathElement):
                 color = elem.style.get('stroke', '#000000').lower()
-                if color in ('#000000', 'black', 'rgb(0,0,0)'):
+                
+                # ПРЕЦИЗНА проверка за черно (както в кода с маркери)
+                is_black = False
+                if color in ('#000000', 'black', '#000', 'rgb(0,0,0)', 'rgb(0, 0, 0)'):
+                    is_black = True
+                elif color.startswith('#') and color.lower() in ('#000000', '#000'):
+                    is_black = True
+                elif color.startswith('rgb(0,0,0') or color.startswith('rgb(0, 0, 0'):
+                    is_black = True
+                elif color == '#000':
+                    is_black = True
+                
+                if is_black:
+                    tool = "P0"  # Биговане
                     priority = 0
-                elif color in ('#ff0000', 'red', 'rgb(255,0,0)'):
-                    priority = 2
+                    has_overcut = False
                 else:
+                    tool = "P1"  # Рязане
                     priority = 1
-                path_data.append((elem, priority))
+                    has_overcut = True
+                
+                # Запазваме повече информация
+                path_data.append({
+                    'elem': elem,
+                    'tool': tool,
+                    'priority': priority,
+                    'has_overcut': has_overcut
+                })
+                
+                # За bounding box
                 csp = CubicSuperPath(elem.path.to_absolute())
                 for subpath in csp:
                     for i in range(len(subpath)):
@@ -110,11 +181,14 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
         max_y = max(p[1] for p in all_points)
 
         hpgl = ["IN", "CMD:18,1;", "CMD:35,1,2,0;"]
-        path_data.sort(key=lambda x: x[1])
+        path_data.sort(key=lambda x: x['priority'])
         current_tool = None
 
-        for elem, priority in path_data:
-            tool = "P0" if priority == 0 else "P1"
+        for item in path_data:
+            elem = item['elem']
+            tool = item['tool']
+            has_overcut = item['has_overcut']
+            
             if tool != current_tool:
                 hpgl.append(f"{tool};")
                 current_tool = tool
@@ -136,15 +210,15 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
                         points_mm.append((x, y))
                     prev = p1
 
-            if tool == "P1" and overcut_mm > 0:
-                points_mm = extend_path_for_overcut(points_mm, overcut_mm)
+            # === ПРИЛАГАНЕ НА ПРАВИЛНИЯ OVERCUT ===
+            if has_overcut and overcut_mm > 0:
+                points_mm = create_real_overcut(points_mm, overcut_mm)
 
             for i, (x, y) in enumerate(points_mm):
                 if tool == "P1":
                     x += knife_offset_mm
 
                 # === ТВОЯТА ИДЕЯ: долу-десен = (0,0) ===
-                # Локални координати спрямо долу-десен ъгъл
                 dx = max_x - x   # 0 = дясно
                 dy = max_y - y   # 0 = долу
 
