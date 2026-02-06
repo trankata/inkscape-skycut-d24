@@ -147,9 +147,23 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
                     priority = 0
                     has_overcut = False
                 else:
-                    tool = "P1"  # Рязане
-                    priority = 1
-                    has_overcut = True
+                    # ПРОВЕРКА ЗА ЧЕРВЕН ЦВЯТ
+                    is_red = False
+                    if color in ('#ff0000', 'red', '#f00', 'rgb(255,0,0)', 'rgb(255, 0, 0)'):
+                        is_red = True
+                    elif color.startswith('#') and color.lower() in ('#ff0000', '#f00'):
+                        is_red = True
+                    elif color.startswith('rgb(255,0,0') or color.startswith('rgb(255, 0, 0'):
+                        is_red = True
+                    
+                    if is_red:
+                        tool = "P1"  # Рязане
+                        priority = 2  # ТРЕТИ - червени (последни)
+                        has_overcut = True
+                    else:
+                        tool = "P1"  # Рязане
+                        priority = 1  # ВТОРИ - други цветове
+                        has_overcut = True
                 
                 # Запазваме повече информация
                 path_data.append({
@@ -181,7 +195,10 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
         max_y = max(p[1] for p in all_points)
 
         hpgl = ["IN", "CMD:18,1;", "CMD:35,1,2,0;"]
+        
+        # Сортираме по priority: 0 (черни), 1 (други), 2 (червени)
         path_data.sort(key=lambda x: x['priority'])
+        
         current_tool = None
 
         for item in path_data:
