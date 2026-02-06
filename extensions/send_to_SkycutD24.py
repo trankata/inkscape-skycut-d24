@@ -200,6 +200,7 @@ class SendToSkyCutD24(inkex.EffectExtension):
             if isinstance(elem, PathElement):
                 color = elem.style.get('stroke', '#000000').lower()
                 
+                # Проверка за черен цвят
                 is_black = False
                 if color in ('#000000', 'black', '#000', 'rgb(0,0,0)', 'rgb(0, 0, 0)'):
                     is_black = True
@@ -212,12 +213,26 @@ class SendToSkyCutD24(inkex.EffectExtension):
                 
                 if is_black:
                     tool = "P0"
-                    priority = 0
+                    priority = 0  # Първи - черни пътища
                     has_overcut = False
                 else:
-                    tool = "P1"
-                    priority = 1
-                    has_overcut = True
+                    # Проверка за червен цвят
+                    is_red = False
+                    if color in ('#ff0000', 'red', '#f00', 'rgb(255,0,0)', 'rgb(255, 0, 0)'):
+                        is_red = True
+                    elif color.startswith('#') and color.lower() in ('#ff0000', '#f00'):
+                        is_red = True
+                    elif color.startswith('rgb(255,0,0') or color.startswith('rgb(255, 0, 0'):
+                        is_red = True
+                    
+                    if is_red:
+                        tool = "P1"
+                        priority = 2  # Трети - червени пътища (последни)
+                        has_overcut = True
+                    else:
+                        tool = "P1"
+                        priority = 1  # Втори - други цветове
+                        has_overcut = True
                 
                 path_data.append({
                     'path': elem.path,
@@ -230,6 +245,7 @@ class SendToSkyCutD24(inkex.EffectExtension):
             inkex.errormsg("❌ Няма пътища в слой 'Cut'!")
             return
 
+        # Сортираме по priority: 0 (черни), 1 (други), 2 (червени)
         path_data.sort(key=lambda x: x['priority'])
 
         # === Генериране на HP-GL ===
