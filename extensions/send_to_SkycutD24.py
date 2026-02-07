@@ -155,7 +155,7 @@ class SendToSkyCutD24(inkex.EffectExtension):
             inkex.errormsg(f"✅ HPGL записан в: {self.options.output_path}")
         else:
             try:
-                with socket.create_connection((self.options.ip, self.options.port), timeout=10) as s:
+                with socket.create_connection((self.options.ip, self.options.port), timeout=180) as s:
                     s.sendall(output.encode())
                 inkex.errormsg("✅ Файлът е изпратен успешно!")
             except Exception as e:
