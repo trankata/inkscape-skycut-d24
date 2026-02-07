@@ -150,10 +150,11 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
             except Exception as e: inkex.errormsg(f"❌ Грешка при запис: {e}")
         else:
             try:
-                with socket.create_connection((self.options.ip, self.options.port), timeout=10) as s:
+                with socket.create_connection((self.options.ip, self.options.port), timeout=180) as s:
                     s.sendall(output.encode())
                 inkex.errormsg(f"✅ Изпратено успешно към {self.options.ip}")
             except Exception as e: inkex.errormsg(f"❌ Грешка при изпращане: {e}")
 
 if __name__ == "__main__":
     SendToSkyCutD24NoMarkers().run()
+
