@@ -28,9 +28,19 @@ class SendToSkyCutD24(inkex.EffectExtension):
         k_off = self.options.knife_offset_mm
         ov_mm = self.options.overcut_mm
 
-        paper_sizes = {'a4p': (210.0, 297.0), 'a4l': (297.0, 210.0)}
+        paper_sizes = {
+            'a4p': (210.0, 297.0), 
+            'a4l': (297.0, 210.0),
+            'a3p': (297.0, 420.0),  # А3 портрет
+            'a3l': (420.0, 297.0)   # А3 ландшафт
+        }
+        
         page_width_mm, page_height_mm = paper_sizes.get(self.options.paper_size, (210.0, 297.0))
 
+        # Дебъг информация
+        inkex.errormsg(f"✅ Избрана медия: {self.options.paper_size}")
+        inkex.errormsg(f"📏 Размери: {page_width_mm} × {page_height_mm} мм")
+    
         viewbox = svg.get_viewbox()
         scale_x = page_width_mm / viewbox[2] if viewbox[2] else 1.0
         scale_y = page_height_mm / viewbox[3] if viewbox[3] else 1.0
@@ -56,8 +66,9 @@ class SendToSkyCutD24(inkex.EffectExtension):
 
         work_width_mm, work_height_mm = max_x - min_x, max_y - min_y
         
+        # КЛЮЧОВА ПРОМЯНА: FSIZE трябва да използва page_ размери за А3!
         hpgl = [
-            "IN", f"FSIZE{int(work_height_mm*SCALE)},{int(work_width_mm*SCALE)}",
+            "IN", f"FSIZE{int(page_height_mm*SCALE)},{int(page_width_mm*SCALE)}",
             f"CMD:32,{int(page_height_mm*SCALE)},{int(page_width_mm*SCALE)},{int(min_x*SCALE)},{int(min_y*SCALE)};",
             "CMD:18,1;", "CMD:35,1,2,0;", f"TB26,{int(work_height_mm*SCALE)},{int(work_width_mm*SCALE)}"
         ]
@@ -69,18 +80,26 @@ class SendToSkyCutD24(inkex.EffectExtension):
                 color = str(stroke).strip().lower() if stroke else ""
                 
                 # ЛОГИКА ЗА ЦВЕТОВЕ
-                is_black = any(c in color for c in ('#000000', 'black', '#000', 'rgb(0,0,0)'))
-                is_red = any(c in color for c in ('#ff0000', 'red', '#f00', 'rgb(255,0,0)'))
+                is_black = any(c in color for c in ('#000000', 'black', '#000', '#000000ff', 'rgb(0,0,0)', 'rgb(0,0,0,1)'))
+                is_red = any(c in color for c in ('#ff0000', 'red', '#f00','#ff0000ff', 'rgb(255,0,0)'))
+
+                # ДЕБЪГ
+                inkex.errormsg(f"DEBUG: color='{color}'")
+                inkex.errormsg(f"DEBUG: is_black={is_black}, is_red={is_red}")
 
                 if is_black:
                     tool, priority = "P0", 0  # Биговане - Първо
+                    inkex.errormsg("DEBUG: ✅ ЗАДАВА P0 ЗА ЧЕРНО!")
                 elif is_red:
                     tool, priority = "P1", 2  # Рязане Червено - Последно
+                    inkex.errormsg("DEBUG: Задава P1 за червено")
                 else:
                     tool, priority = "P1", 1  # Други цветове - Второ
+                    inkex.errormsg(f"DEBUG: Задава P1 за цвят: {color}")
 
                 path = elem.path.to_absolute()
-                if elem.transform: path = path.transform(elem.transform)
+                if elem.transform: 
+                    path = path.transform(elem.transform)
                 path_data.append({'path': path, 'tool': tool, 'priority': priority})
 
         # Сортиране по дефинирания приоритет
