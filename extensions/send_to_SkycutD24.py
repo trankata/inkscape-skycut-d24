@@ -7,6 +7,8 @@ import math
 
 SCALE = 40 
 STEPS_PER_SEGMENT = 16
+# МИНИМАЛНО РАЗСТОЯНИЕ В ММ (ако точките са по-близо от това, се пропускат)
+MIN_DIST_MM = 0.05 
 
 def cubic_point(p0, c1, c2, p1, t):
     x = ((1 - t)**3 * p0[0] + 3 * (1 - t)**2 * t * c1[0] + 3 * (1 - t) * t**2 * c2[0] + t**3 * p1[0])
@@ -31,16 +33,12 @@ class SendToSkyCutD24(inkex.EffectExtension):
         paper_sizes = {
             'a4p': (210.0, 297.0), 
             'a4l': (297.0, 210.0),
-            'a3p': (297.0, 420.0),  # А3 портрет
-            'a3l': (420.0, 297.0)   # А3 ландшафт
+            'a3p': (297.0, 420.0),
+            'a3l': (420.0, 297.0)
         }
         
         page_width_mm, page_height_mm = paper_sizes.get(self.options.paper_size, (210.0, 297.0))
 
-        # Дебъг информация
-        inkex.errormsg(f"✅ Избрана медия: {self.options.paper_size}")
-        inkex.errormsg(f"📏 Размери: {page_width_mm} × {page_height_mm} мм")
-    
         viewbox = svg.get_viewbox()
         scale_x = page_width_mm / viewbox[2] if viewbox[2] else 1.0
         scale_y = page_height_mm / viewbox[3] if viewbox[3] else 1.0
@@ -66,7 +64,6 @@ class SendToSkyCutD24(inkex.EffectExtension):
 
         work_width_mm, work_height_mm = max_x - min_x, max_y - min_y
         
-        # КЛЮЧОВА ПРОМЯНА: FSIZE трябва да използва page_ размери за А3!
         hpgl = [
             "IN", f"FSIZE{int(page_height_mm*SCALE)},{int(page_width_mm*SCALE)}",
             f"CMD:32,{int(page_height_mm*SCALE)},{int(page_width_mm*SCALE)},{int(min_x*SCALE)},{int(min_y*SCALE)};",
@@ -79,30 +76,21 @@ class SendToSkyCutD24(inkex.EffectExtension):
                 stroke = elem.style.get('stroke')
                 color = str(stroke).strip().lower() if stroke else ""
                 
-                # ЛОГИКА ЗА ЦВЕТОВЕ
-                is_black = any(c in color for c in ('#000000', 'black', '#000', '#000000ff', 'rgb(0,0,0)', 'rgb(0,0,0,1)'))
+                is_black = any(c in color for c in ('#000000', 'black', '#000', '#000000ff', 'rgb(0,0,0)'))
                 is_red = any(c in color for c in ('#ff0000', 'red', '#f00','#ff0000ff', 'rgb(255,0,0)'))
 
-                # ДЕБЪГ
-                inkex.errormsg(f"DEBUG: color='{color}'")
-                inkex.errormsg(f"DEBUG: is_black={is_black}, is_red={is_red}")
-
                 if is_black:
-                    tool, priority = "P0", 0  # Биговане - Първо
-                    inkex.errormsg("DEBUG: ✅ ЗАДАВА P0 ЗА ЧЕРНО!")
+                    tool, priority = "P0", 0
                 elif is_red:
-                    tool, priority = "P1", 2  # Рязане Червено - Последно
-                    inkex.errormsg("DEBUG: Задава P1 за червено")
+                    tool, priority = "P1", 2
                 else:
-                    tool, priority = "P1", 1  # Други цветове - Второ
-                    inkex.errormsg(f"DEBUG: Задава P1 за цвят: {color}")
+                    tool, priority = "P1", 1
 
                 path = elem.path.to_absolute()
                 if elem.transform: 
                     path = path.transform(elem.transform)
                 path_data.append({'path': path, 'tool': tool, 'priority': priority})
 
-        # Сортиране по дефинирания приоритет
         path_data.sort(key=lambda x: x['priority'])
 
         current_tool = None
@@ -127,7 +115,6 @@ class SendToSkyCutD24(inkex.EffectExtension):
                 is_closed = math.hypot(pts[0][0]-pts[-1][0], pts[0][1]-pts[-1][1]) < 0.2
                 final_pts = list(pts)
                 
-                # Оверкът само за P1 инструменти
                 if ov_mm > 0 and is_closed and p_info['tool'] == "P1":
                     acc = 0
                     last_p = pts[0]
@@ -144,10 +131,22 @@ class SendToSkyCutD24(inkex.EffectExtension):
                                             last_p[1] + (pts[j][1]-last_p[1])*r))
                             break
 
+                # --- ТУК Е МОДИФИКАЦИЯТА ЗА ОПТИМИЗАЦИЯ ---
                 last_tx, last_ty = None, None
+                last_real_x, last_real_y = -9999, -9999 # За пресмятане на реално разстояние
+
                 for i in range(len(final_pts)):
                     px, py = final_pts[i]
-                    # Нож офсет само за P1 инструменти
+                    
+                    # Първо смятаме разстоянието от последната ЗАПИСАНА точка (в мм)
+                    dist_from_last = math.hypot(px - last_real_x, py - last_real_y)
+                    
+                    # Ако не е първа точка, не е последна точка и е прекалено близо - пропускаме
+                    if i != 0 and i != len(final_pts)-1 and dist_from_last < MIN_DIST_MM:
+                        continue
+
+                    # Прилагаме нож офсет
+                    curr_px, curr_py = px, py
                     if p_info['tool'] == "P1" and k_off > 0:
                         if i < len(final_pts)-1:
                             dx, dy = final_pts[i+1][0]-px, final_pts[i+1][1]-py
@@ -155,16 +154,17 @@ class SendToSkyCutD24(inkex.EffectExtension):
                             dx, dy = px-final_pts[i-1][0], py-final_pts[i-1][1]
                         dist = math.hypot(dx, dy)
                         if dist > 0.001:
-                            px += (dx/dist)*k_off
-                            py += (dy/dist)*k_off
+                            curr_px += (dx/dist)*k_off
+                            curr_py += (dy/dist)*k_off
 
-                    x_l, y_l = px - min_x, py - min_y
+                    x_l, y_l = curr_px - min_x, curr_py - min_y
                     x_hpgl, y_hpgl = work_height_mm - y_l, work_width_mm - x_l
                     tx, ty = int(round(x_hpgl*SCALE)), int(round(y_hpgl*SCALE))
                     
                     if tx != last_tx or ty != last_ty:
                         hpgl.append(f"{'U' if i == 0 else 'D'}{tx},{ty};")
                         last_tx, last_ty = tx, ty
+                        last_real_x, last_real_y = px, py # Запазваме позицията за следващата проверка
 
         hpgl.extend(["U0,0;", "@;", "@;"])
         output = "\n".join(hpgl)
