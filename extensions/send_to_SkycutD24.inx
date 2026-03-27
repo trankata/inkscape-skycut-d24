@@ -8,7 +8,7 @@
 • Markers must be in a layer named exactly „Mark“ (4 markers required).
 • All cutting paths must be in a layer named exactly „Cut“.
 
-COLORS & CUTTING ORDER:
+COLORS &amp; CUTTING ORDER:
 • Black → creasing (P0) → first
 • All other colors → cutting (P1)
   – Red → outer contour → last
