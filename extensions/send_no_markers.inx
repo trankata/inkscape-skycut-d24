@@ -18,6 +18,7 @@
 
   <param name="knife_offset_mm" type="float" min="0.0" max="1.0" precision="2" gui-text="Knife offset (mm)">0.30</param>
   <param name="overcut_mm" type="float" min="0.0" max="2.0" precision="2" gui-text="Overcut (mm)">1.00</param>
+  <param name="turn_knife_mm" type="float" min="0.0" max="3.0" precision="2" gui-text="Turn knife (mm), 0 = изключен">0.00</param>
 
   <param name="save_hpgl" type="bool" gui-text="💾 Save HP-GL file instead of sending">false</param>
   <param name="output_path" type="string" gui-text="Output path">skycut_output.hpgl</param>
