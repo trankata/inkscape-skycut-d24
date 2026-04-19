@@ -15,20 +15,146 @@ def cubic_point(p0, c1, c2, p1, t):
     y = mt**3*p0[1] + 3*mt**2*t*c1[1] + 3*mt*t**2*c2[1] + t**3*p1[1]
     return x, y
 
+def is_straight(p0, c1, c2, p1, tol=0.01):
+    dx = p1[0] - p0[0]
+    dy = p1[1] - p0[1]
+    seg_len = math.hypot(dx, dy)
+    if seg_len < 0.001:
+        return True
+    nx = dx / seg_len
+    ny = dy / seg_len
+    c1d = abs((c1[0]-p0[0]) * ny - (c1[1]-p0[1]) * nx)
+    c2d = abs((c2[0]-p0[0]) * ny - (c2[1]-p0[1]) * nx)
+    return c1d < tol and c2d < tol
+
+def apply_corner_offset(pts, k_off, is_closed):
+    """При всеки вътрешен ъгъл вмъква две точки:
+    1. Върхът + k_off по старата посока (подминава)
+    2. Върхът + k_off по новата посока (излиза)
+    При затворен контур pts[0]==pts[-1] — обработваме и началния връх.
+    """
+    if k_off <= 0 or len(pts) < 3:
+        return pts
+
+    MIN_ANGLE = math.radians(10)
+
+    # За затворен контур: последната точка съвпада с първата.
+    # Работим с уникалните точки (без последното дублиране),
+    # после добавяме затварящата точка обратно накрая.
+    if is_closed and len(pts) >= 2:
+        work = pts[:-1]  # без дублираната последна точка
+    else:
+        work = pts
+
+    n = len(work)
+    result = []
+
+    for i in range(n):
+        pt = work[i]
+
+        # За отворени контури — без първата и последната точка.
+        if not is_closed and (i == 0 or i == n - 1):
+            result.append(pt)
+            continue
+
+        # i==0 (началният връх) при затворен контур:
+        # Обработваме го — подминава от последния сегмент и излиза по първия.
+        # НО: добавяме само over_pt (подминаването) — exit_pt е самата pts[0]
+        # която се добавя нормално като начало на контура.
+        # Всъщност за i==0 при затворен контур добавяме САМО over_pt в края,
+        # след като обходим всички останали точки.
+        # Затова i==0 пропускаме тук и го обработваме отделно след цикъла.
+        if i == 0:
+            result.append(pt)
+            continue
+
+        prev_pt = work[(i - 1) % n]
+        next_pt = work[(i + 1) % n]
+
+        in_dx  = pt[0] - prev_pt[0]
+        in_dy  = pt[1] - prev_pt[1]
+        in_len = math.hypot(in_dx, in_dy)
+
+        out_dx  = next_pt[0] - pt[0]
+        out_dy  = next_pt[1] - pt[1]
+        out_len = math.hypot(out_dx, out_dy)
+
+        if in_len < 0.001 or out_len < 0.001:
+            result.append(pt)
+            continue
+
+        in_nx  = in_dx  / in_len
+        in_ny  = in_dy  / in_len
+        out_nx = out_dx / out_len
+        out_ny = out_dy / out_len
+
+        dot   = in_nx * out_nx + in_ny * out_ny
+        dot   = max(-1.0, min(1.0, dot))
+        angle = math.acos(dot)
+
+        if angle < MIN_ANGLE:
+            result.append(pt)
+            continue
+
+        # Подминава върха по старата посока
+        over_pt = (pt[0] + in_nx * k_off, pt[1] + in_ny * k_off)
+        # Излиза от върха по новата посока
+        exit_pt = (pt[0] + out_nx * k_off, pt[1] + out_ny * k_off)
+
+        result.append(over_pt)
+        result.append(exit_pt)
+
+    # Обработваме началния връх (i==0) при затворен контур:
+    # Ножът идва от последната точка към pts[0] — подминава pts[0] по тази посока.
+    if is_closed and len(work) >= 2:
+        pt       = work[0]
+        prev_pt  = work[-1]   # последната уникална точка
+        next_pt  = work[1]    # втората точка (посока на излизане)
+
+        in_dx  = pt[0] - prev_pt[0]
+        in_dy  = pt[1] - prev_pt[1]
+        in_len = math.hypot(in_dx, in_dy)
+
+        out_dx  = next_pt[0] - pt[0]
+        out_dy  = next_pt[1] - pt[1]
+        out_len = math.hypot(out_dx, out_dy)
+
+        if in_len > 0.001 and out_len > 0.001:
+            in_nx  = in_dx  / in_len
+            in_ny  = in_dy  / in_len
+            out_nx = out_dx / out_len
+            out_ny = out_dy / out_len
+
+            dot   = in_nx * out_nx + in_ny * out_ny
+            dot   = max(-1.0, min(1.0, dot))
+            angle = math.acos(dot)
+
+            if angle >= MIN_ANGLE:
+                # Подминава началния връх по посоката на влизане
+                over_pt = (pt[0] + in_nx * k_off, pt[1] + in_ny * k_off)
+                result.append(over_pt)
+
+    # Затварящата точка е pts[0] — вече е в result[0]
+    if is_closed and len(result) > 0:
+        result.append(result[0])
+
+    return result
+
 class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
     def add_arguments(self, pars):
         pars.add_argument("--ip", type=str, default="192.168.0.233")
         pars.add_argument("--port", type=int, default=8080)
         pars.add_argument("--knife_offset_mm", type=float, default=0.30)
         pars.add_argument("--overcut_mm", type=float, default=1.00)
+        pars.add_argument("--turn_knife_mm", type=float, default=0.00)
         pars.add_argument("--save_hpgl", type=inkex.Boolean, default=False)
         pars.add_argument("--output_path", type=str, default="skycut_output.hpgl")
 
     def effect(self):
         k_off = self.options.knife_offset_mm
         ov_mm = self.options.overcut_mm
+        tk_mm = self.options.turn_knife_mm
 
-        # Намиране на слой 'Cut'
         cut_layer = next((l for l in self.svg.xpath("//svg:g[@inkscape:groupmode='layer']")
                          if l.label and l.label.strip().lower() == 'cut'), None)
 
@@ -56,28 +182,32 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
 
                 abs_path = elem.path.to_absolute()
 
-                # ПОПРАВКА 1: composed_transform() за пълната трансформация вкл. групи
                 composed = elem.composed_transform()
                 if composed:
                     abs_path = abs_path.transform(composed)
                 elif elem.transform:
                     abs_path = abs_path.transform(elem.transform)
 
-                # ПОПРАВКА 2: ZoneClose за надеждна проверка на затвореност
                 is_closed_svg = any(isinstance(seg, ZoneClose) for seg in elem.path.to_absolute())
 
                 csp = CubicSuperPath(abs_path)
                 for subpath in csp:
                     if len(subpath) < 2:
                         continue
+
                     pts = []
                     for i in range(1, len(subpath)):
-                        p0 = subpath[i-1][1]
-                        c1 = subpath[i-1][2]
-                        c2 = subpath[i][0]
-                        p1 = subpath[i][1]
-                        for s in range(STEPS_PER_SEGMENT):
-                            pts.append(cubic_point(p0, c1, c2, p1, s / STEPS_PER_SEGMENT))
+                        p0 = tuple(subpath[i-1][1])
+                        c1 = tuple(subpath[i-1][2])
+                        c2 = tuple(subpath[i][0])
+                        p1 = tuple(subpath[i][1])
+
+                        if is_straight(p0, c1, c2, p1):
+                            pts.append(p0)
+                        else:
+                            for s in range(STEPS_PER_SEGMENT):
+                                pts.append(cubic_point(p0, c1, c2, p1, s / STEPS_PER_SEGMENT))
+
                     pts.append(tuple(subpath[-1][1]))
 
                     if pts:
@@ -108,43 +238,103 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
 
             pts       = item['pts']
             is_closed = item['is_closed']
-            final_pts = list(pts)
 
-            # Overcut
+            # ── Стъпка 1: corner blade offset ────────────────────────────────
+            # Прилагаме corner offset върху основния контур (pts).
+            # pts[0] не се обработва (i==0 е изключен в apply_corner_offset).
+            # Overcut и връщането се добавят СЛЕД това като чисти точки.
+            raw_start = pts[0]  # оригиналната начална точка
+            if item['tool'] == "P1" and k_off > 0:
+                work_pts = apply_corner_offset(pts, k_off, is_closed)
+            else:
+                work_pts = list(pts)
+
+            # ── Стъпка 2: overcut ────────────────────────────────────────────
+            # Добавяме overcut върху work_pts (след corner offset).
+            # Overcut следва реалната крива от pts[0] напред.
+            # Финалното връщане е в raw_start (оригиналната начална точка).
+            final_pts = list(work_pts)
+
             if item['tool'] == "P1" and ov_mm > 0 and is_closed:
-                acc    = 0
-                last_p = pts[0]
-                for j in range(1, len(pts)):
-                    d = math.hypot(pts[j][0] - last_p[0], pts[j][1] - last_p[1])
+                acc   = 0.0
+                prev  = raw_start
+                added = False
+                # Обхождаме pts[1..n-2] — без последната точка която съвпада с pts[0]
+                ov_end = len(pts) - 1 if math.hypot(pts[-1][0]-pts[0][0], pts[-1][1]-pts[0][1]) < 0.001 else len(pts)
+                for j in range(1, ov_end):
+                    cur = pts[j]
+                    d = math.hypot(cur[0] - prev[0], cur[1] - prev[1])
                     if d < 0.001:
                         continue
                     if acc + d >= ov_mm:
                         r = (ov_mm - acc) / d
                         final_pts.append((
-                            last_p[0] + (pts[j][0] - last_p[0]) * r,
-                            last_p[1] + (pts[j][1] - last_p[1]) * r
+                            prev[0] + (cur[0] - prev[0]) * r,
+                            prev[1] + (cur[1] - prev[1]) * r
                         ))
+                        added = True
                         break
-                    final_pts.append(pts[j])
-                    acc   += d
-                    last_p = pts[j]
+                    acc  += d
+                    prev  = cur
+                if not added and len(pts) > 1:
+                    final_pts.append(pts[1])
+                # Връщаме се в оригиналната начална точка
+                final_pts.append(raw_start)
 
-            # ПОПРАВКА 3: Посока на първия сегмент за knife offset на началната точка
-            # Така началото и краят имат еднакъв offset → не разминаване
-            first_dx, first_dy = 0.0, 0.0
+            # ── Стъпка 3: lead-in (blade offset за началната точка) ──────────
+            # Изместваме началото назад по оригиналния контур с k_off мм.
+            lead_pt = None
             if item['tool'] == "P1" and k_off > 0 and is_closed and len(final_pts) > 1:
+                acc  = 0.0
+                prev = raw_start
+                for j in range(len(pts) - 2, -1, -1):
+                    cur = pts[j]
+                    d = math.hypot(cur[0] - prev[0], cur[1] - prev[1])
+                    if d < 0.001:
+                        continue
+                    if acc + d >= k_off:
+                        r = (k_off - acc) / d
+                        lead_pt = (
+                            prev[0] + (cur[0] - prev[0]) * r,
+                            prev[1] + (cur[1] - prev[1]) * r
+                        )
+                        break
+                    acc  += d
+                    prev  = cur
+
+                if lead_pt is not None:
+                    final_pts = [lead_pt] + final_pts
+
+            # ── Стъпка 4: turn knife ─────────────────────────────────────────
+            tk_hpgl = []
+            if item['tool'] == "P1" and tk_mm > 0 and len(final_pts) > 1:
+                dx, dy = 0.0, 0.0
                 for j in range(1, len(final_pts)):
                     fdx = final_pts[j][0] - final_pts[0][0]
                     fdy = final_pts[j][1] - final_pts[0][1]
                     fd  = math.hypot(fdx, fdy)
                     if fd > 0.001:
-                        first_dx = fdx / fd
-                        first_dy = fdy / fd
+                        dx = fdx / fd
+                        dy = fdy / fd
                         break
 
-            last_tx, last_ty       = None, None
+                if dx != 0.0 or dy != 0.0:
+                    tx_s = int(round((max_y - (final_pts[0][1] - dy * tk_mm)) * SCALE))
+                    ty_s = int(round((max_x - (final_pts[0][0] - dx * tk_mm)) * SCALE))
+                    tx_e = int(round((max_y - final_pts[0][1]) * SCALE))
+                    ty_e = int(round((max_x - final_pts[0][0]) * SCALE))
+                    tk_hpgl = [
+                        f"U{tx_s},{ty_s};",
+                        f"D{tx_e},{ty_e};",
+                        f"U{tx_e},{ty_e};"
+                    ]
+
+            # ── Стъпка 5: HPGL команди ───────────────────────────────────────
+            for cmd in tk_hpgl:
+                hpgl.append(cmd)
+
+            last_tx, last_ty         = None, None
             last_real_x, last_real_y = -9999, -9999
-            first_hpgl_point       = None  # ПОПРАВКА 4: за точно затваряне
 
             for i in range(len(final_pts)):
                 px, py = final_pts[i]
@@ -153,43 +343,14 @@ class SendToSkyCutD24NoMarkers(inkex.EffectExtension):
                 if i != 0 and i != len(final_pts) - 1 and dist_from_last < MIN_DIST_MM:
                     continue
 
-                curr_px, curr_py = px, py
-                if item['tool'] == "P1" and k_off > 0:
-                    if i == 0 and is_closed and (first_dx != 0.0 or first_dy != 0.0):
-                        # Начална точка → посока на първия сегмент
-                        curr_px += first_dx * k_off
-                        curr_py += first_dy * k_off
-                    elif i < len(final_pts) - 1:
-                        dx, dy = final_pts[i+1][0] - px, final_pts[i+1][1] - py
-                        dist = math.hypot(dx, dy)
-                        if dist > 0.001:
-                            curr_px += (dx / dist) * k_off
-                            curr_py += (dy / dist) * k_off
-                    else:
-                        dx, dy = px - final_pts[i-1][0], py - final_pts[i-1][1]
-                        dist = math.hypot(dx, dy)
-                        if dist > 0.001:
-                            curr_px += (dx / dist) * k_off
-                            curr_py += (dy / dist) * k_off
-
-                tx = int(round((max_y - curr_py) * SCALE))
-                ty = int(round((max_x - curr_px) * SCALE))
+                tx = int(round((max_y - py) * SCALE))
+                ty = int(round((max_x - px) * SCALE))
 
                 if tx != last_tx or ty != last_ty:
                     cmd = 'U' if i == 0 else 'D'
                     hpgl.append(f"{cmd}{tx},{ty};")
-
-                    if i == 0:
-                        first_hpgl_point = (tx, ty)
-
-                    last_tx, last_ty     = tx, ty
+                    last_tx, last_ty         = tx, ty
                     last_real_x, last_real_y = px, py
-
-            # ПОПРАВКА 4: Затваряме точно на началната HPGL точка
-            if is_closed and ov_mm > 0 and item['tool'] == "P1" and first_hpgl_point:
-                ftx, fty = first_hpgl_point
-                if ftx != last_tx or fty != last_ty:
-                    hpgl.append(f"D{ftx},{fty};")
 
         hpgl.extend(["U0,0;", "@;", "@;"])
         output = "\n".join(hpgl)
