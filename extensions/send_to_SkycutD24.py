@@ -130,7 +130,9 @@ class SendToSkyCutD24(inkex.EffectExtension):
         for elem in mark_layer.iterdescendants():
             if isinstance(elem, PathElement) and elem.get('data-type') != 'triangle':
                 path = elem.path.to_absolute()
-                seg  = path[0]
+                # Втората точка (index 1) е върхът на L-маркера
+                # Първата точка е края на рамото — не върхът!
+                seg = path[1] if len(path) > 1 else path[0]
                 try:
                     pt_x = seg.end.x if hasattr(seg, 'end') else seg.x
                     pt_y = seg.end.y if hasattr(seg, 'end') else seg.y
