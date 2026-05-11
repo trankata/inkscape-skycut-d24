@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+  <meta charset="UTF-8">
+  <title>HPGL Viewer — Универсален</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 10px; background: #0a0f1a; color: #c8d8e8;
+      font-family: 'Courier New', monospace; height: 100vh; display: flex; flex-direction: column; gap: 8px;
+    }
+    textarea {
+      width: 100%; height: 100px; background: #0a1520; border: 1px solid #1a3050;
+      color: #7ec8a0; padding: 8px; font-size: 10px; resize: vertical;
+    }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    button {
+      background: transparent; border: 1px solid #00eebb; color: #00eebb;
+      padding: 5px 10px; cursor: pointer; border-radius: 4px; font-size: 11px;
+    }
+    button:hover { background: rgba(0,238,187,0.15); }
+    button.stop { border-color: #ff5050; color: #ff5050; }
+    label { font-size: 10px; color: #8899aa; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+    input[type="checkbox"] { accent-color: #00eebb; cursor: pointer; }
+    .canvas-wrap {
+      flex: 1; position: relative; min-height: 300px; border: 1px solid #1a3050;
+      border-radius: 4px; overflow: hidden; background: #060b14;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+    .stats { font-size: 10px; color: #557799; display: flex; gap: 10px; flex-wrap: wrap; }
+    .stats span { color: #00eebb; }
+    .legend { font-size: 9px; color: #8899aa; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .scale-indicator {
+      position: absolute; bottom: 10px; right: 10px;
+      background: rgba(10,15,26,0.85); border: 1px solid #1a3050;
+      padding: 4px 8px; border-radius: 3px; font-size: 9px; display: flex; align-items: center; gap: 6px;
+    }
+    .scale-line { height: 2px; background: #00eebb; }
+    .coords {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(10,15,26,0.85); border: 1px solid #1a3050;
+      padding: 4px 8px; border-radius: 3px; font-size: 9px;
+      font-family: monospace; color: #8899aa;
+    }
+  </style>
+</head>
+<body>
+  <h3 style="margin:0;color:#00eebb;font-size:14px">✂️ HPGL Viewer — SkyCut</h3>
+  
+  <textarea id="hpglInput" placeholder="Поставете HPGL код тук..."></textarea>
+  
+  <div class="controls">
+    <button id="renderBtn">▶ RENDER</button>
+    <button id="animBtn">⟳ АНИМАЦИЯ</button>
+    <button id="loadFileBtn">📁 ФАЙЛ</button>
+    <input type="file" id="fileInput" accept=".plt,.hpgl,.txt" style="display:none">
+    <label><input type="checkbox" id="showTravel" checked> Pen up</label>
+    <label><input type="checkbox" id="grid" checked> Мрежа</label>
+    <label><input type="checkbox" id="showPoints" checked> 🟢 Точки</label>
+    <label><input type="checkbox" id="showCoords" checked> Координати</label>
+    <label>Speed: <input type="range" id="speed" min="5" max="100" value="40" style="width:60px"></label>
+  </div>
+  
+  <div class="stats" id="stats">Статистика: —</div>
+  <div class="legend">
+    <div class="legend-item"><div class="dot" style="background:#ffdd00"></div><span>START</span></div>
+    <div class="legend-item"><div class="dot" style="background:#00ff00"></div><span>✂️ Начало</span></div>
+    <div class="legend-item"><div class="dot" style="background:#ff0000"></div><span>✂️ Край</span></div>
+  </div>
+  
+  <div class="canvas-wrap">
+    <canvas id="canvas"></canvas>
+    <div class="coords" id="coords"></div>
+    <div class="scale-indicator">
+      <div class="scale-line" id="scaleLine"></div>
+      <span>50 мм</span>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let segments = [];
+    let animating = false, animFrame = null, currentStep = 0;
+    const HPGL_PER_MM = 40;
+
+    function parseHPGL(text) {
+      const moves = [];
+      const lines = text.replace(/\r/g, '').split(/[\n;]+/);
+      let x = 0, y = 0;
+      for (let line of lines) {
+        line = line.trim().toUpperCase();
+        if (!line || line === 'IN' || line === 'PA' || line.startsWith('P1') || line.startsWith('CMD:') || line === '@' || line.startsWith('FS') || line.startsWith('VS') || line.startsWith('US')) continue;
+        const u = line.match(/^U\s*(-?\d+)\s*,\s*(-?\d+)/);
+        const d = line.match(/^D\s*(-?\d+)\s*,\s*(-?\d+)/);
+        if (u) { moves.push({type:'U', x:+u[1], y:+u[2], fx:x, fy:y}); x=+u[1]; y=+u[2]; }
+        else if (d) { moves.push({type:'D', x:+d[1], y:+d[2], fx:x, fy:y}); x=+d[1]; y=+d[2]; }
+      }
+      return moves;
+    }
+
+    function drawMarker(x, y, color, label, offsetY) {
+      ctx.beginPath(); ctx.arc(x, y, 7, 0, Math.PI*2);
+      ctx.fillStyle = color + '35'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI*2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.fillStyle = color; ctx.font = 'bold 10px monospace';
+      ctx.fillText(label, x + 9, y + offsetY);
+    }
+
+    function draw() {
+      const rect = canvas.parentElement.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+      const W = canvas.width, H = canvas.height;
+      ctx.clearRect(0, 0, W, H);
+
+      if (!segments.length) {
+        ctx.fillStyle = '#334455'; ctx.font = '12px monospace'; ctx.textAlign = 'center';
+        ctx.fillText('PASTE HPGL → RENDER', W/2, H/2); return;
+      }
+
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      for (const s of segments) {
+        minX=Math.min(minX,s.fx,s.x); minY=Math.min(minY,s.fy,s.y);
+        maxX=Math.max(maxX,s.fx,s.x); maxY=Math.max(maxY,s.fy,s.y);
+      }
+      const drawW = maxX-minX || 1;
+      const drawH = maxY-minY || 1;
+
+      // Uniform scale
+      const pad = 60;
+      const scaleX = (W - pad*2) / drawW;
+      const scaleY = (H - pad*2) / drawH;
+      const scale = Math.min(scaleX, scaleY);
+
+      const offX = pad + (W - pad*2 - drawW*scale)/2;
+      const offY = pad + (H - pad*2 - drawH*scale)/2;
+
+      const tx = x => offX + (x - minX) * scale;
+      const ty = y => offY + (maxY - y) * scale;
+
+      // Update scale indicator
+      document.getElementById('scaleLine').style.width = (50 * HPGL_PER_MM * scale) + 'px';
+      
+      // Show coordinates info
+      if (document.getElementById('showCoords').checked) {
+        document.getElementById('coords').innerHTML = 
+          `X: ${minX}-${maxX} (${(drawW/HPGL_PER_MM).toFixed(1)}мм)<br>` +
+          `Y: ${minY}-${maxY} (${(drawH/HPGL_PER_MM).toFixed(1)}мм)<br>` +
+          `Център: (${((minX+maxX)/2|0)}, ${((minY+maxY)/2|0)})`;
+      }
+
+      const limit = animating ? currentStep : segments.length;
+      const showTravel = document.getElementById('showTravel').checked;
+      const showPoints = document.getElementById('showPoints').checked;
+
+      // Grid
+      if (document.getElementById('grid').checked) {
+        ctx.strokeStyle = 'rgba(30,60,100,0.25)'; ctx.lineWidth = 0.5;
+        const step = 400 * scale;
+        const startX = offX - (offX % step);
+        const startY = offY - (offY % step);
+        for (let x=startX; x<W; x+=step) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+        for (let y=startY; y<H; y+=step) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+      }
+
+      // Travel
+      if (showTravel) {
+        ctx.strokeStyle='rgba(255,170,0,0.35)'; ctx.lineWidth=0.8; ctx.setLineDash([4,4]);
+        for(let i=0;i<limit;i++) if(segments[i].type==='U'){
+          ctx.beginPath(); ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy)); ctx.lineTo(tx(segments[i].x),ty(segments[i].y)); ctx.stroke();
+        }
+        ctx.setLineDash([]);
+      }
+
+      // Cut
+      for(let i=0;i<limit;i++) if(segments[i].type==='D'){
+        ctx.strokeStyle='rgba(0,238,187,0.15)'; ctx.lineWidth=4; ctx.beginPath();
+        ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy)); ctx.lineTo(tx(segments[i].x),ty(segments[i].y)); ctx.stroke();
+        ctx.strokeStyle='#00eebb'; ctx.lineWidth=1.5; ctx.beginPath();
+        ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy)); ctx.lineTo(tx(segments[i].x),ty(segments[i].y)); ctx.stroke();
+      }
+
+      // Markers
+      if (showPoints) {
+        const first = segments[0];
+        drawMarker(tx(first.fx), ty(first.fy), '#ffdd00', 'START', -12);
+
+        const cuts = segments.filter(m => m.type === 'D');
+        if (cuts.length > 0) {
+          const cStart = cuts[0];
+          const cEnd = cuts[cuts.length - 1];
+          const distPx = Math.hypot(cEnd.x - cStart.fx, cEnd.y - cStart.fy) * scale;
+          const labelOff = distPx < 40 ? (Math.abs(ty(cStart.fy) - ty(cEnd.y)) > 20 ? 14 : -14) : 12;
+
+          drawMarker(tx(cStart.fx), ty(cStart.fy), '#00ff00', '✂️ НАЧАЛО', labelOff);
+          drawMarker(tx(cEnd.x), ty(cEnd.y), '#ff0000', '✂️ КРАЙ', distPx < 40 ? -labelOff : -labelOff);
+        }
+      }
+
+      // Knife cursor
+      if (animating && currentStep>0 && currentStep<=segments.length) {
+        const s=segments[currentStep-1];
+        ctx.beginPath(); ctx.arc(tx(s.x),ty(s.y),4,0,Math.PI*2);
+        ctx.fillStyle=s.type==='D'?'#00ffcc':'#ffdd00'; ctx.fill();
+      }
+    }
+
+    function process() {
+      const text = document.getElementById('hpglInput').value;
+      segments = parseHPGL(text);
+      const cuts = segments.filter(m=>m.type==='D');
+      let total=0; for(const m of cuts) total+=Math.hypot(m.x-m.fx, m.y-m.fy);
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      for(const m of segments){ minX=Math.min(minX,m.fx,m.x); minY=Math.min(minY,m.fy,m.y); maxX=Math.max(maxX,m.fx,m.x); maxY=Math.max(maxY,m.fy,m.y); }
+      document.getElementById('stats').innerHTML = 
+        `Команди: <span>${segments.length}</span> | ` +
+        `Рязане: <span>${cuts.length}</span> | ` +
+        `Размер: <span>${((maxX-minX)/HPGL_PER_MM).toFixed(1)}×${((maxY-minY)/HPGL_PER_MM).toFixed(1)} мм</span> | ` +
+        `Дължина: <span>${(total/HPGL_PER_MM).toFixed(1)} мм</span>`;
+      currentStep=0; draw();
+    }
+
+    function animate() {
+      if(!segments.length) return;
+      animating=!animating;
+      const btn=document.getElementById('animBtn');
+      if(animating){
+        btn.textContent='■ СТОП'; btn.classList.add('stop'); currentStep=0;
+        const spd=+document.getElementById('speed').value;
+        function loop(){ if(!animating)return; currentStep++; draw();
+          if(currentStep<segments.length) animFrame=setTimeout(loop,120-spd);
+          else{ animating=false; btn.textContent='⟳ АНИМАЦИЯ'; btn.classList.remove('stop'); }
+        } loop();
+      } else { clearTimeout(animFrame); btn.textContent='⟳ АНИМАЦИЯ'; btn.classList.remove('stop'); draw(); }
+    }
+
+    document.getElementById('renderBtn').onclick=process;
+    document.getElementById('animBtn').onclick=animate;
+    ['showTravel','grid','showPoints','showCoords'].forEach(id=>document.getElementById(id).onchange=draw);
+    document.getElementById('loadFileBtn').onclick=()=>document.getElementById('fileInput').click();
+    document.getElementById('fileInput').onchange=e=>{ if(!e.target.files[0])return; const r=new FileReader(); r.onload=ev=>{document.getElementById('hpglInput').value=ev.target.result;process();}; r.readAsText(e.target.files[0]); };
+    window.addEventListener('resize', draw);
+
+    // Your new circle
+    document.getElementById('hpglInput').value=`IN;PA;P1;U965,1638;D963,1680;D962,1722;D964,1764;D967,1806;D972,1847;D978,1888;D986,1928;D996,1968;D1007,2007;D1020,2045;D1034,2083;D1050,2120;D1067,2156;D1085,2191;D1105,2225;D1126,2259;D1149,2291;D1172,2323;D1197,2354;D1223,2383;D1250,2412;D1278,2439;D1307,2466;D1338,2491;D1369,2515;D1401,2538;D1434,2559;D1468,2580;D1503,2599;D1539,2616;D1575,2633;D1612,2647;D1650,2661;D1689,2672;D1728,2683;D1768,2691;D1808,2698;D1849,2704;D1891,2708;D1932,2710;D1975,2710;D2017,2709;D2059,2706;D2100,2701;D2141,2695;D2181,2686;D2221,2677;D2260,2666;D2298,2653;D2335,2639;D2372,2623;D2408,2606;D2444,2587;D2478,2568;D2511,2547;D2544,2524;D2576,2501;D2606,2476;D2636,2450;D2665,2423;D2692,2395;D2718,2365;D2744,2335;D2768,2304;D2791,2272;D2812,2239;D2832,2205;D2851,2170;D2869,2134;D2885,2098;D2900,2060;D2913,2022;D2925,1984;D2935,1945;D2944,1905;D2951,1865;D2957,1824;D2960,1782;D2963,1740;D2963,1698;D2962,1656;D2958,1614;D2954,1573;D2947,1532;D2939,1492;D2929,1452;D2918,1413;D2905,1375;D2891,1337;D2876,1301;D2859,1264;D2840,1229;D2820,1195;D2799,1161;D2777,1129;D2753,1097;D2728,1066;D2703,1037;D2675,1008;D2647,981;D2618,954;D2588,929;D2557,905;D2524,882;D2491,861;D2457,840;D2422,821;D2387,804;D2350,788;D2313,773;D2275,759;D2237,748;D2197,737;D2158,729;D2117,722;D2076,716;D2035,712;D1993,710;D1951,710;D1908,711;D1867,714;D1825,719;D1785,726;D1744,734;D1705,743;D1666,754;D1628,767;D1590,781;D1553,797;D1517,814;D1482,833;D1448,852;D1414,874;D1381,896;D1350,919;D1319,944;D1289,970;D1261,997;D1233,1025;D1207,1055;D1182,1085;D1158,1116;D1135,1148;D1113,1182;D1093,1216;D1074,1250;D1056,1286;D1040,1323;D1025,1360;D1012,1398;D1000,1436;D990,1475;D981,1515;D974,1556;D969,1596;D965,1638;D963,1678;U0,0;@;`;
+    process();
+  </script>
+</body>
+</html>
