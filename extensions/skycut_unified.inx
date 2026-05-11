@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <name>U_Send to SkyCut D24</name>
+  <name>U Send to SkyCut D24</name>
   <id>skycut.send.to.d24.unified</id>
   <param name="help" type="description">ПРЕДИ РЯЗАНЕ:
 • Слоят с пътищата трябва да се казва точно „Cut".
