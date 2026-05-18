@@ -173,7 +173,7 @@ def overcut_along_path(pts, ov_dist):
             added = True; break
         phase2.append(cur); acc += d; prev = cur
     if not added and len(work) > 1:
-        phase2.append(work[1])  # втората точка = правилна посока
+        phase2.append(work[1])
     return phase2
 
 
@@ -340,21 +340,17 @@ def compute_depths(paths):
     """Assign nesting depth to each closed path. Depth 0 = outermost."""
     n = len(paths)
     depths = [0]*n
-    # Build containment matrix (simple O(n^2) using bounding box + point-in-poly)
     for i in range(n):
         if not paths[i]['is_closed']:
-            depths[i] = -1  # mark open paths as not participating
+            depths[i] = -1
             continue
         poly_i = paths[i]['pts']
-        # representative point: first point or centroid
         rep_i = (sum(p[0] for p in poly_i)/len(poly_i), sum(p[1] for p in poly_i)/len(poly_i))
-        # count how many paths contain rep_i
         count = 0
         for j in range(n):
             if i == j: continue
             if not paths[j]['is_closed']: continue
             poly_j = paths[j]['pts']
-            # quick bounding box check
             minx_j = min(p[0] for p in poly_j)
             maxx_j = max(p[0] for p in poly_j)
             miny_j = min(p[1] for p in poly_j)
@@ -368,22 +364,12 @@ def compute_depths(paths):
 
 
 def group_into_islands(paths, depths):
-    """Group paths into islands (list of lists). Each island contains paths that belong together.
-    An island is defined by a root path (depth=0) and all paths that are inside it (depth>0)
-    but not inside any other root. For multiple separate depth=0 paths, they are different islands.
-    Open paths (depth=-1) become separate islands of their own."""
     closed_indices = [i for i, d in enumerate(depths) if d >= 0]
-    # map each closed path to its root (the smallest-depth containing path)
-    # Since depths are absolute counts, root is any path with depth=0 that contains this path.
-    # However, for paths with depth>0, we need to find the immediate parent? For island grouping,
-    # we can assign each path to the outermost containing path (depth=0) that contains it.
-    # If there are multiple depth=0 (separate islands), then each path will be inside exactly one depth=0.
     roots = {}
     for i in closed_indices:
         if depths[i] == 0:
-            roots[i] = i   # root points to itself
+            roots[i] = i
         else:
-            # find a depth=0 that contains this path's representative point
             rep_i = (sum(p[0] for p in paths[i]['pts'])/len(paths[i]['pts']),
                      sum(p[1] for p in paths[i]['pts'])/len(paths[i]['pts']))
             for j in closed_indices:
@@ -391,37 +377,25 @@ def group_into_islands(paths, depths):
                     roots[i] = j
                     break
             else:
-                # fallback: treat as separate island (should not happen for valid nesting)
                 roots[i] = i
-    # Build island groups
     island_dict = {}
     for i in closed_indices:
         root = roots.get(i, i)
         island_dict.setdefault(root, []).append(i)
-    # Also handle open paths (depth=-1) as separate islands each
     open_indices = [i for i, d in enumerate(depths) if d == -1]
     for i in open_indices:
-        island_dict[i] = [i]   # each open path alone
-    # Convert to list of lists
+        island_dict[i] = [i]
     islands = list(island_dict.values())
     return islands
 
 
 def sort_island_paths(island_idx_list, paths, depths, nesting_order):
-    """Sort paths within one island according to nesting_order.
-    Returns a list of path indices in cutting order for this island.
-    """
-    # Separate closed paths (depth>=0) and open paths (depth==-1)
     closed = [i for i in island_idx_list if depths[i] >= 0]
     open_paths = [i for i in island_idx_list if depths[i] == -1]
-    # Sort closed by depth according to order
     if nesting_order == 'inside_first':
-        # deeper first (higher depth)
         closed.sort(key=lambda i: depths[i], reverse=True)
-    else:  # outside_first
-        closed.sort(key=lambda i: depths[i])  # shallower first
-    # For paths with same depth, optionally apply nearest neighbor to reduce travel
-    # Group by depth
+    else:
+        closed.sort(key=lambda i: depths[i])
     groups = {}
     for i in closed:
         d = depths[i]
@@ -430,10 +404,7 @@ def sort_island_paths(island_idx_list, paths, depths, nesting_order):
     for d in sorted(groups.keys(), reverse=(nesting_order=='inside_first')):
         group = groups[d]
         if len(group) > 1:
-            # Apply nearest neighbor reordering within same depth
-            # Use first point of each path as reference
             pts_list = [(paths[idx]['pts'][0], idx) for idx in group]
-            # simple greedy
             ordered = [pts_list[0]]
             remaining = pts_list[1:]
             while remaining:
@@ -449,13 +420,11 @@ def sort_island_paths(island_idx_list, paths, depths, nesting_order):
             result.extend([idx for _, idx in ordered])
         else:
             result.extend(group)
-    # Append open paths (they have no depth) in original order (or could be sorted by position)
     result.extend(open_paths)
     return result
 
 
 def nearest_neighbor_sort_items(items, get_start_point):
-    """Generic nearest neighbor sort for list of items, using a function to get start point (x,y)."""
     if len(items) <= 1:
         return items
     result = [items[0]]
@@ -475,7 +444,6 @@ def nearest_neighbor_sort_items(items, get_start_point):
 
 
 def two_opt_items(items, get_start_point):
-    """2-opt improvement on a list of items."""
     if len(items) <= 3:
         return items
 
@@ -506,6 +474,7 @@ class SkyCutNesting(inkex.EffectExtension):
         pars.add_argument("--paper_size",      type=str,           default="a4p")
         pars.add_argument("--auto_nesting",    type=inkex.Boolean, default=True)
         pars.add_argument("--nesting_order",   type=str,           default="inside_first")
+        pars.add_argument("--viewer_type",     type=str,           default="browser", choices=["browser","tkinter"])
         pars.add_argument("--ip",              type=str,           default="192.168.0.233")
         pars.add_argument("--port",            type=int,           default=8080)
         pars.add_argument("--knife_offset_mm", type=float,         default=0.30)
@@ -524,6 +493,7 @@ class SkyCutNesting(inkex.EffectExtension):
         use_markers  = self.options.use_markers
         auto_nesting = self.options.auto_nesting
         nesting_order = self.options.nesting_order
+        viewer_type = self.options.viewer_type
 
         paper_sizes = {
             'a4p': (210.0, 297.0), 'a4l': (297.0, 210.0),
@@ -545,12 +515,10 @@ class SkyCutNesting(inkex.EffectExtension):
         if cut_layer is None:
             inkex.errormsg("Липсва слой Cut"); return
 
-        # Extract paths
         all_paths = process_elements(cut_layer, scale_x, scale_y)
         if not all_paths:
             inkex.errormsg("Няма намерени пътища за рязане"); return
 
-        # Separate by priority (0,1,2) because P0 and P1 are different tools
         all_paths.sort(key=lambda x: x['priority'])
         prioritized_groups = []
         for _, grp in groupby(all_paths, key=lambda x: x['priority']):
@@ -560,49 +528,33 @@ class SkyCutNesting(inkex.EffectExtension):
 
         for group in prioritized_groups:
             if auto_nesting and any(p['is_closed'] for p in group):
-                # Compute depths for all paths in this group (only closed matter, open get -1)
                 depths = compute_depths(group)
-                # Group into islands
                 islands = group_into_islands(group, depths)
                 ordered_islands = []
-                # For each island, produce ordered list of path indices (within group)
                 for island_idx_list in islands:
                     ordered_indices = sort_island_paths(island_idx_list, group, depths, nesting_order)
                     ordered_islands.append(ordered_indices)
-                # Now order islands themselves by nearest neighbor using first point of first path in each island
                 island_start_points = []
                 for island in ordered_islands:
                     first_idx = island[0]
                     start_pt = group[first_idx]['pts'][0]
                     island_start_points.append((start_pt, island))
-                # Sort islands by nearest neighbor
                 sorted_islands = nearest_neighbor_sort_items(island_start_points, lambda x: x[0])
                 sorted_islands = [isl for _, isl in sorted_islands]
-                # Optionally apply 2-opt on islands (global optimization)
                 if len(sorted_islands) > 3:
-                    # Convert to list of items for 2-opt: each item is (start_pt, island)
                     items_2opt = [(group[isl[0]]['pts'][0], isl) for isl in sorted_islands]
                     items_2opt = two_opt_items(items_2opt, lambda x: x[0])
                     sorted_islands = [isl for _, isl in items_2opt]
-                # Flatten into final path list for this priority group
                 for island in sorted_islands:
                     for idx in island:
                         final_path_sequence.append(group[idx])
             else:
-                # Original behavior: nearest neighbor + 2-opt on entire group
-                # But we need to consider open/closed? Original sorted by start point.
-                # We'll use the original nearest neighbor on the group directly
-                # First, make a copy of group items
                 items = list(group)
-                # Nearest neighbor sort
                 items = nearest_neighbor_sort_items(items, lambda p: p['pts'][0])
-                # 2-opt improvement
                 if len(items) > 3:
                     items = two_opt_items(items, lambda p: p['pts'][0])
                 final_path_sequence.extend(items)
 
-        # Now final_path_sequence contains all paths in desired order
-        # Build coordinate system (same as original)
         if use_markers:
             mark_layer = next(
                 (l for l in svg.xpath("//svg:g[@inkscape:groupmode='layer']")
@@ -649,7 +601,6 @@ class SkyCutNesting(inkex.EffectExtension):
                 inkex.errormsg(f"DEBUG: Markers={len(marker_points)}, "
                                f"work={work_w:.1f}x{work_h:.1f}mm")
         else:
-            # No markers: coordinate from bounding box
             all_x = [p[0] for item in final_path_sequence for p in item['pts']]
             all_y = [p[1] for item in final_path_sequence for p in item['pts']]
             max_x_bb = max(all_x); max_y_bb = max(all_y)
@@ -659,7 +610,6 @@ class SkyCutNesting(inkex.EffectExtension):
                 return tx, ty
             hpgl = ["IN;", "PA;", "CMD:18,1;", "CMD:35,1,2,0;"]
 
-        # Generate HPGL commands
         current_tool = None
         for item in final_path_sequence:
             if item['tool'] != current_tool:
@@ -726,13 +676,15 @@ class SkyCutNesting(inkex.EffectExtension):
             with open(self.options.output_path, "w") as f:
                 f.write(output)
             inkex.errormsg(f"HPGL saved: {self.options.output_path}")
-            import webbrowser, tempfile
-            html_content = self._build_viewer_html(output)
-            tmp = tempfile.NamedTemporaryFile(
-                suffix=".html", delete=False, mode="w", encoding="utf-8")
-            tmp.write(html_content)
-            tmp.close()
-            webbrowser.open(f"file://{tmp.name}")
+            if viewer_type == "tkinter":
+                self._show_tkinter_viewer(output)
+            else:
+                import webbrowser, tempfile
+                html_content = self._build_viewer_html(output)
+                tmp = tempfile.NamedTemporaryFile(suffix=".html", delete=False, mode="w", encoding="utf-8")
+                tmp.write(html_content)
+                tmp.close()
+                webbrowser.open(f"file://{tmp.name}")
         else:
             try:
                 with socket.create_connection(
@@ -742,6 +694,194 @@ class SkyCutNesting(inkex.EffectExtension):
                 inkex.errormsg("Sent OK")
             except Exception as e:
                 inkex.errormsg(f"Send error: {e}")
+
+    def _show_tkinter_viewer(self, hpgl_data):
+        try:
+            import tkinter as tk
+            from tkinter import ttk
+        except ImportError:
+            inkex.errormsg("Tkinter не е наличен. Показвам визуализация в браузър.")
+            self._build_viewer_html(hpgl_data)
+            return
+
+        # Parse HPGL
+        segments = []
+        lines = hpgl_data.replace('\r', '').split(';')
+        x = y = 0
+        for line in lines:
+            line = line.strip().upper()
+            if not line:
+                continue
+            if not (line[0] == 'U' or line[0] == 'D'):
+                continue
+            parts = line[1:].split(',')
+            if len(parts) < 2:
+                continue
+            try:
+                nx = int(parts[0])
+                ny = int(parts[1])
+            except ValueError:
+                continue
+            if line[0] == 'U':
+                segments.append(('U', x, y, nx, ny))
+                x, y = nx, ny
+            else:
+                segments.append(('D', x, y, nx, ny))
+                x, y = nx, ny
+
+        if not segments:
+            inkex.errormsg("Няма команди за визуализация.")
+            return
+
+        # Bounding box
+        all_x = [s[1] for s in segments] + [s[3] for s in segments]
+        all_y = [s[2] for s in segments] + [s[4] for s in segments]
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        width = max_x - min_x
+        height = max_y - min_y
+        if width < 1:
+            width = 1
+        if height < 1:
+            height = 1
+
+        root = tk.Tk()
+        root.title("HPGL Viewer - SkyCut Nesting")
+        root.geometry("950x750")
+
+        ctrl_frame = tk.Frame(root)
+        ctrl_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        anim_var = tk.BooleanVar(value=False)
+        step_var = tk.IntVar(value=0)
+        max_steps = len(segments)
+
+        # --- Step slider (manual position) ---
+        step_label = tk.Label(ctrl_frame, text="Стъпка:", fg="#8899aa", bg="#0a0f1a", font=("monospace",9))
+        step_label.pack(side=tk.LEFT, padx=5)
+        step_slider = tk.Scale(ctrl_frame, from_=0, to=max_steps, orient=tk.HORIZONTAL, variable=step_var,
+                               length=300, bg="#0a1520", fg="#00eebb", highlightthickness=0)
+        step_slider.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+        step_val_label = tk.Label(ctrl_frame, text="0", fg="#00eebb", bg="#0a0f1a", font=("monospace",8))
+        step_val_label.pack(side=tk.LEFT, padx=2)
+
+        def update_step_label(*args):
+            step_val_label.config(text=f"{step_var.get()}/{max_steps}")
+        step_var.trace_add('write', update_step_label)
+        # When slider moves, redraw and stop animation
+        def slider_changed(val):
+            if anim_var.get():
+                anim_var.set(False)
+                anim_btn.config(text="Animate")
+            redraw()
+        step_slider.configure(command=slider_changed)
+
+        # --- Speed control ---
+        speed_var = tk.IntVar(value=0)
+        speed_label = tk.Label(ctrl_frame, text="Закъснение (ms):", fg="#8899aa", bg="#0a0f1a", font=("monospace",9))
+        speed_label.pack(side=tk.LEFT, padx=5)
+        speed_scale = tk.Scale(ctrl_frame, from_=0, to=200, orient=tk.HORIZONTAL, variable=speed_var,
+                               length=100, bg="#0a1520", fg="#00eebb", highlightthickness=0)
+        speed_scale.pack(side=tk.LEFT, padx=5)
+        speed_val_label = tk.Label(ctrl_frame, text="0 ms (max)", fg="#00eebb", bg="#0a0f1a", font=("monospace",8))
+        speed_val_label.pack(side=tk.LEFT, padx=2)
+
+        def update_speed_label(*args):
+            val = speed_var.get()
+            speed_val_label.config(text=f"{val} ms" if val > 0 else "0 ms (max)")
+        speed_var.trace_add('write', update_speed_label)
+
+        # --- Drawing functions ---
+        def draw(canvas, step, scale, offset_x, offset_y):
+            canvas.delete("all")
+            for i, seg in enumerate(segments[:step]):
+                typ, x1, y1, x2, y2 = seg
+                cx1 = offset_x + (x1 - min_x) * scale
+                cy1 = offset_y + (max_y - y1) * scale
+                cx2 = offset_x + (x2 - min_x) * scale
+                cy2 = offset_y + (max_y - y2) * scale
+                if typ == 'D':
+                    canvas.create_line(cx1, cy1, cx2, cy2, fill="#00eebb", width=2)
+                else:
+                    canvas.create_line(cx1, cy1, cx2, cy2, fill="#ffaa00", width=1, dash=(4,4))
+            if step > 0:
+                typ, x1, y1, x2, y2 = segments[step-1]
+                cx = offset_x + (x2 - min_x) * scale
+                cy = offset_y + (max_y - y2) * scale
+                canvas.create_oval(cx-4, cy-4, cx+4, cy+4, fill="#ff00cc", outline="")
+
+        def redraw():
+            w = canvas.winfo_width()
+            h = canvas.winfo_height()
+            if w <= 1 or h <= 1:
+                return
+            scale = min((w-100)/width, (h-100)/height)
+            offset_x = 50 + (w-100 - width*scale)/2
+            offset_y = 50 + (h-100 - height*scale)/2
+            draw(canvas, step_var.get(), scale, offset_x, offset_y)
+
+        canvas = tk.Canvas(root, bg="#0a1520", highlightthickness=0)
+        canvas.pack(fill=tk.BOTH, expand=True)
+        canvas.bind("<Configure>", lambda e: redraw())
+
+        # --- Animation logic ---
+        def animate():
+            if anim_var.get():
+                if step_var.get() < max_steps:
+                    step_var.set(step_var.get() + 1)
+                    redraw()
+                    delay = speed_var.get()
+                    if delay > 0:
+                        root.after(delay, animate)
+                    else:
+                        root.after_idle(animate)
+                else:
+                    anim_var.set(False)
+                    anim_btn.config(text="Animate")
+            else:
+                anim_btn.config(text="Animate")
+
+        def start_animate():
+            if anim_var.get():
+                anim_var.set(False)
+                anim_btn.config(text="Animate")
+            else:
+                if step_var.get() >= max_steps:
+                    step_var.set(0)
+                    redraw()
+                anim_var.set(True)
+                anim_btn.config(text="Stop")
+                animate()
+
+        def instant_render():
+            anim_var.set(False)
+            anim_btn.config(text="Animate")
+            step_var.set(max_steps)
+            redraw()
+
+        def reset():
+            step_var.set(0)
+            redraw()
+            anim_var.set(False)
+            anim_btn.config(text="Animate")
+
+        # --- Buttons ---
+        btn_frame = tk.Frame(ctrl_frame)
+        btn_frame.pack(side=tk.LEFT, padx=5)
+        tk.Button(btn_frame, text="Render", command=redraw, bg="#1a3050", fg="#00eebb").pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text="Instant", command=instant_render, bg="#1a3050", fg="#00eebb").pack(side=tk.LEFT, padx=2)
+        anim_btn = tk.Button(btn_frame, text="Animate", command=start_animate, bg="#1a3050", fg="#00eebb")
+        anim_btn.pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text="Reset", command=reset, bg="#1a3050", fg="#00eebb").pack(side=tk.LEFT, padx=2)
+        tk.Button(btn_frame, text="Close", command=root.destroy, bg="#1a3050", fg="#ff5050").pack(side=tk.RIGHT, padx=2)
+
+        # Statistics
+        cuts = [s for s in segments if s[0]=='D']
+        total_len = sum(math.hypot(s[3]-s[1], s[4]-s[2]) for s in cuts) / 40.0
+        info = f"Commands: {len(segments)}  |  Cut segments: {len(cuts)}  |  Total length: {total_len:.1f} mm"
+        tk.Label(ctrl_frame, text=info, fg="#8899aa", bg="#0a0f1a", font=("monospace",9)).pack(side=tk.LEFT, padx=10)
+
+        root.mainloop()
 
     def _build_viewer_html(self, hpgl_data):
         hpgl_escaped = hpgl_data.replace('\\', '\\\\').replace('`', '\\`')
@@ -902,6 +1042,7 @@ class SkyCutNesting(inkex.EffectExtension):
         lines.append('process();')
         lines.append('</script></body></html>')
         return '\n'.join(lines)
+
 
 if __name__ == "__main__":
     SkyCutNesting().run()
