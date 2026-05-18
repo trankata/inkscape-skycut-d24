@@ -37,6 +37,11 @@
   <param name="port" type="int" min="1" max="65535" gui-text="Порт">8080</param>
 
   <param name="debug" type="bool" gui-text="🔍 Debug режим">false</param>
+  
+  <param name="viewer_type" type="optiongroup" gui-text="Изглед при запазване на HPGL">
+  <option value="browser">Браузър (HTML)</option>
+  <option value="tkinter">Изскачащ прозорец (Tkinter)</option>
+  </param>
 
   <effect>
     <object-type>all</object-type>
