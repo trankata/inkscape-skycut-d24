@@ -1,46 +1,47 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <name>SkyCut D24 (с острови и авто-влагане)</name>
+  <name>Cut with SkyCut D24</name>
   <id>skycut.send.to.d24.nesting</id>
-  <param name="help" type="description">ПРЕДИ РЯЗАНЕ:
-• Слоят с пътищата трябва да се казва точно "Cut".
-• При режим С маркери: слоят с маркерите трябва да се казва "Mark" (4 маркера).
-ОСТРОВИ (стикери):
-• Автоматично разпознава отделните стикери и реже всеки изцяло (първо вътрешни, после външен) преди следващия.
-ЦВЕТОВЕ:
-• Черен → биговане (P0) → първо
-• Всички останали (червен, зелен, син…) → рязане (P1) – редът се определя от вложеността, ако auto_nesting е включен.</param>
 
-  <param name="use_markers" type="bool" gui-text="📍 Използвай маркери за регистрация">false</param>
+  <param name="help" type="description">BEFORE CUTTING:
+    • The layer with paths must be named exactly "Cut".
+    • When using markers: the layer with markers must be named "Mark" (4 markers).
+    ISLANDS (stickers):
+    • Automatically detects separate stickers and cuts each entirely (inner first, then outer) before the next.
+    COLORS:
+    • Black → creasing (P0) → first
+    • All others (red, green, blue…) → cutting (P1) – order determined by nesting if auto_nesting is enabled.</param>
 
-  <param name="paper_size" type="optiongroup" gui-text="📄 Размер на медията">
+  <param name="use_markers" type="bool" gui-text="📍 Use registration markers">false</param>
+
+  <param name="paper_size" type="optiongroup" gui-text="📄 Media size">
     <option value="a4p">A4 Portrait</option>
     <option value="a4l">A4 Landscape</option>
     <option value="a3p">A3 Portrait</option>
     <option value="a3l">A3 Landscape</option>
   </param>
 
-  <param name="auto_nesting" type="bool" gui-text="🧩 Автоматично разпознаване на острови и вложени контури (вътрешни → външни)">true</param>
-  <param name="nesting_order" type="optiongroup" gui-text="Ред на рязане в рамките на остров">
-    <option value="inside_first">Първо вътрешни, после външен</option>
-    <option value="outside_first">Първо външен, после вътрешни</option>
+  <param name="auto_nesting" type="bool" gui-text="🧩 Auto-detect islands and nested contours (inner → outer)">true</param>
+  <param name="nesting_order" type="optiongroup" gui-text="Cutting order within island">
+    <option value="inside_first">Inside first, then outside</option>
+    <option value="outside_first">Outside first, then inside</option>
   </param>
 
   <param name="knife_offset_mm" type="float" min="0.0" max="1.0" precision="2" gui-text="Knife offset (mm)">0.30</param>
   <param name="overcut_mm" type="float" min="0.0" max="2.0" precision="2" gui-text="Overcut (mm)">1.00</param>
-  <param name="turn_knife_mm" type="float" min="0.0" max="3.0" precision="2" gui-text="Turn knife (mm), 0 = изключен">0.50</param>
+  <param name="turn_knife_mm" type="float" min="0.0" max="3.0" precision="2" gui-text="Turn knife (mm), 0 = disabled">0.50</param>
 
-  <param name="save_hpgl" type="bool" gui-text="💾 Запази HP-GL файл вместо изпращане">false</param>
-  <param name="output_path" type="string" gui-text="Път за запис">test_skycut_output.hpgl</param>
+  <param name="save_hpgl" type="bool" gui-text="💾 Save HP-GL file instead of sending">false</param>
+  <param name="output_path" type="string" gui-text="Output path">test_skycut_output.hpgl</param>
 
-  <param name="ip" type="string" gui-text="IP адрес">192.168.0.233</param>
-  <param name="port" type="int" min="1" max="65535" gui-text="Порт">8080</param>
+  <param name="ip" type="string" gui-text="IP address">192.168.0.233</param>
+  <param name="port" type="int" min="1" max="65535" gui-text="Port">8080</param>
 
-  <param name="debug" type="bool" gui-text="🔍 Debug режим">false</param>
-  
-  <param name="viewer_type" type="optiongroup" gui-text="Изглед при запазване на HPGL">
-  <option value="browser">Браузър (HTML)</option>
-  <option value="tkinter">Изскачащ прозорец (Tkinter)</option>
+  <param name="debug" type="bool" gui-text="🔍 Debug mode">false</param>
+
+  <param name="viewer_type" type="optiongroup" gui-text="HPGL viewer">
+    <option value="browser">Browser (HTML)</option>
+    <option value="tkinter">Popup window (Tkinter)</option>
   </param>
 
   <effect>
