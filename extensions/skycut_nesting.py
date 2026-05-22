@@ -792,22 +792,33 @@ class SkyCutNesting(inkex.EffectExtension):
         speed_var.trace_add('write', update_speed_label)
 
         # --- Drawing functions ---
+        # Ротация 90° наляво: x_rot = y_orig, y_rot = max_x - x_orig
+        rot_width  = height   # след ротация ширината е оригиналната височина
+        rot_height = width    # след ротация височината е оригиналната ширина
+
         def draw(canvas, step, scale, offset_x, offset_y):
             canvas.delete("all")
             for i, seg in enumerate(segments[:step]):
                 typ, x1, y1, x2, y2 = seg
-                cx1 = offset_x + (x1 - min_x) * scale
-                cy1 = offset_y + (max_y - y1) * scale
-                cx2 = offset_x + (x2 - min_x) * scale
-                cy2 = offset_y + (max_y - y2) * scale
+                # Прилагаме ротация 90° наляво
+                rx1 = (y1 - min_y)
+                ry1 = (max_x - x1)
+                rx2 = (y2 - min_y)
+                ry2 = (max_x - x2)
+                cx1 = offset_x + rx1 * scale
+                cy1 = offset_y + ry1 * scale
+                cx2 = offset_x + rx2 * scale
+                cy2 = offset_y + ry2 * scale
                 if typ == 'D':
                     canvas.create_line(cx1, cy1, cx2, cy2, fill="#00eebb", width=2)
                 else:
                     canvas.create_line(cx1, cy1, cx2, cy2, fill="#ffaa00", width=1, dash=(4,4))
             if step > 0:
                 typ, x1, y1, x2, y2 = segments[step-1]
-                cx = offset_x + (x2 - min_x) * scale
-                cy = offset_y + (max_y - y2) * scale
+                rx = (y2 - min_y)
+                ry = (max_x - x2)
+                cx = offset_x + rx * scale
+                cy = offset_y + ry * scale
                 canvas.create_oval(cx-4, cy-4, cx+4, cy+4, fill="#ff00cc", outline="")
 
         def redraw():
@@ -815,9 +826,9 @@ class SkyCutNesting(inkex.EffectExtension):
             h = canvas.winfo_height()
             if w <= 1 or h <= 1:
                 return
-            scale = min((w-100)/width, (h-100)/height)
-            offset_x = 50 + (w-100 - width*scale)/2
-            offset_y = 50 + (h-100 - height*scale)/2
+            scale = min((w-100)/rot_width, (h-100)/rot_height)
+            offset_x = 50 + (w-100 - rot_width*scale)/2
+            offset_y = 50 + (h-100 - rot_height*scale)/2
             draw(canvas, step_var.get(), scale, offset_x, offset_y)
 
         canvas = tk.Canvas(root, bg="#0a1520", highlightthickness=0)
@@ -888,7 +899,7 @@ class SkyCutNesting(inkex.EffectExtension):
         lines = [
             '<!DOCTYPE html>',
             '<html lang="en"><head><meta charset="UTF-8">',
-            '<title>HPGL Viewer SkyCut</title>',
+            '<title>HPGL Viewer SkyCut (rotated 90° left)</title>',
             '<style>',
             '* { box-sizing: border-box; }',
             'body { margin:0; padding:10px; background:#0a0f1a; color:#c8d8e8;',
@@ -914,7 +925,7 @@ class SkyCutNesting(inkex.EffectExtension):
             '  background:rgba(10,15,26,0.85); border:1px solid #1a3050;',
             '  padding:4px 8px; border-radius:3px; font-size:9px; color:#8899aa; }',
             '</style></head><body>',
-            '<h3 style="margin:0;color:#00eebb;font-size:14px">HPGL Viewer SkyCut</h3>',
+            '<h3 style="margin:0;color:#00eebb;font-size:14px">HPGL Viewer SkyCut (rotated 90° left)</h3>',
             '<textarea id="hpglInput"></textarea>',
             '<div class="controls">',
             '  <button id="renderBtn">RENDER</button>',
@@ -935,7 +946,8 @@ class SkyCutNesting(inkex.EffectExtension):
             'let segments=[],animating=false,animFrame=null,currentStep=0;',
             'const HPM=40;',
             'function parseHPGL(text){',
-            '  const moves=[],lines=text.replace(/\\r/g,"").split(/[\\n;]+/);',
+            '  const moves=[];',
+            '  const lines=text.replace(/\\r/g,"").split(/[\\n;]+/);',
             '  let x=0,y=0;',
             '  for(let line of lines){',
             '    line=line.trim().toUpperCase();',
@@ -943,9 +955,25 @@ class SkyCutNesting(inkex.EffectExtension):
             '       line.startsWith("CMD:")||line==="@"||line.startsWith("TB")||line.startsWith("FSIZE"))continue;',
             '    const u=line.match(/^U\\s*(-?\\d+)\\s*,\\s*(-?\\d+)/);',
             '    const d=line.match(/^D\\s*(-?\\d+)\\s*,\\s*(-?\\d+)/);',
-            '    if(u){moves.push({type:"U",x:+u[1],y:+u[2],fx:x,fy:y});x=+u[1];y=+u[2];}',
-            '    else if(d){moves.push({type:"D",x:+d[1],y:+d[2],fx:x,fy:y});x=+d[1];y=+d[2];}',
-            '  }return moves;',
+            '    if(u){',
+            '      const nx=+u[1], ny=+u[2];',
+            '      // apply 90° left rotation: (x,y) -> (-y, x)',
+            '      const rot_fx = -y, rot_fy = x;',
+            '      const rot_x  = -ny, rot_y  = nx;',
+            '      moves.push({type:"U", x:nx, y:ny, fx:x, fy:y,',
+            '                  rx:rot_x, ry:rot_y, rfx:rot_fx, rfy:rot_fy});',
+            '      x=nx; y=ny;',
+            '    }',
+            '    else if(d){',
+            '      const nx=+d[1], ny=+d[2];',
+            '      const rot_fx = -y, rot_fy = x;',
+            '      const rot_x  = -ny, rot_y  = nx;',
+            '      moves.push({type:"D", x:nx, y:ny, fx:x, fy:y,',
+            '                  rx:rot_x, ry:rot_y, rfx:rot_fx, rfy:rot_fy});',
+            '      x=nx; y=ny;',
+            '    }',
+            '  }',
+            '  return moves;',
             '}',
             'function drawDot(x,y,color,label,oy){',
             '  ctx.beginPath();ctx.arc(x,y,7,0,Math.PI*2);ctx.fillStyle=color+"35";ctx.fill();',
@@ -960,18 +988,22 @@ class SkyCutNesting(inkex.EffectExtension):
             '  ctx.clearRect(0,0,W,H);',
             '  if(!segments.length){ctx.fillStyle="#334455";ctx.font="12px monospace";',
             '    ctx.textAlign="center";ctx.fillText("PASTE HPGL -> RENDER",W/2,H/2);return;}',
+            '  // find bounds using rotated coordinates',
             '  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;',
-            '  for(const s of segments){minX=Math.min(minX,s.fx,s.x);minY=Math.min(minY,s.fy,s.y);',
-            '    maxX=Math.max(maxX,s.fx,s.x);maxY=Math.max(maxY,s.fy,s.y);}',
-            '  const dW=maxX-minX||1,dH=maxY-minY||1,pad=60;',
+            '  for(const s of segments){',
+            '    minX=Math.min(minX,s.rfx,s.rx);',
+            '    minY=Math.min(minY,s.rfy,s.ry);',
+            '    maxX=Math.max(maxX,s.rfx,s.rx);',
+            '    maxY=Math.max(maxY,s.rfy,s.ry);',
+            '  }',
+            '  const dW=maxX-minX||1, dH=maxY-minY||1, pad=60;',
             '  const scale=Math.min((W-pad*2)/dW,(H-pad*2)/dH);',
-            '  const offX=pad+(W-pad*2-dW*scale)/2,offY=pad+(H-pad*2-dH*scale)/2;',
-            '  const tx=x=>offX+(x-minX)*scale,ty=y=>offY+(maxY-y)*scale;',
+            '  const offX=pad+(W-pad*2-dW*scale)/2, offY=pad+(H-pad*2-dH*scale)/2;',
+            '  const tx=x=>offX+(x-minX)*scale, ty=y=>offY+(maxY-y)*scale; // Y inverted for canvas',
             '  document.getElementById("scaleLine").style.width=(50*HPM*scale)+"px";',
             '  document.getElementById("coords").innerHTML=',
-            '    "X:"+minX+"-"+maxX+" ("+((maxX-minX)/HPM).toFixed(1)+"mm)<br>"+',
-            '    "Y:"+minY+"-"+maxY+" ("+((maxY-minY)/HPM).toFixed(1)+"mm)";',
-            '  const limit=animating?currentStep:segments.length;',
+            '    "Rotated X: "+minX.toFixed(0)+"…"+maxX.toFixed(0)+" ("+((maxX-minX)/HPM).toFixed(1)+"mm)<br>"+',
+            '    "Rotated Y: "+minY.toFixed(0)+"…"+maxY.toFixed(0)+" ("+((maxY-minY)/HPM).toFixed(1)+"mm)";',
             '  if(document.getElementById("grid").checked){',
             '    ctx.strokeStyle="rgba(30,60,100,0.25)";ctx.lineWidth=0.5;',
             '    const step=400*scale;',
@@ -980,43 +1012,45 @@ class SkyCutNesting(inkex.EffectExtension):
             '  }',
             '  if(document.getElementById("showTravel").checked){',
             '    ctx.strokeStyle="rgba(255,170,0,0.35)";ctx.lineWidth=0.8;ctx.setLineDash([4,4]);',
-            '    for(let i=0;i<limit;i++)if(segments[i].type==="U"){',
-            '      ctx.beginPath();ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy));',
-            '      ctx.lineTo(tx(segments[i].x),ty(segments[i].y));ctx.stroke();}',
+            '    for(let i=0;i<(animating?currentStep:segments.length);i++)if(segments[i].type==="U"){',
+            '      ctx.beginPath();ctx.moveTo(tx(segments[i].rfx),ty(segments[i].rfy));',
+            '      ctx.lineTo(tx(segments[i].rx),ty(segments[i].ry));ctx.stroke();}',
             '    ctx.setLineDash([]);',
             '  }',
-            '  for(let i=0;i<limit;i++)if(segments[i].type==="D"){',
+            '  for(let i=0;i<(animating?currentStep:segments.length);i++)if(segments[i].type==="D"){',
             '    ctx.strokeStyle="rgba(0,238,187,0.15)";ctx.lineWidth=4;',
-            '    ctx.beginPath();ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy));',
-            '    ctx.lineTo(tx(segments[i].x),ty(segments[i].y));ctx.stroke();',
+            '    ctx.beginPath();ctx.moveTo(tx(segments[i].rfx),ty(segments[i].rfy));',
+            '    ctx.lineTo(tx(segments[i].rx),ty(segments[i].ry));ctx.stroke();',
             '    ctx.strokeStyle="#00eebb";ctx.lineWidth=1.5;',
-            '    ctx.beginPath();ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy));',
-            '    ctx.lineTo(tx(segments[i].x),ty(segments[i].y));ctx.stroke();',
+            '    ctx.beginPath();ctx.moveTo(tx(segments[i].rfx),ty(segments[i].rfy));',
+            '    ctx.lineTo(tx(segments[i].rx),ty(segments[i].ry));ctx.stroke();',
             '  }',
             '  if(document.getElementById("showPoints").checked){',
             '    const cuts=segments.filter(m=>m.type==="D");',
             '    if(cuts.length>0){',
-            '      drawDot(tx(cuts[0].fx),ty(cuts[0].fy),"#00ff00","START",12);',
-            '      drawDot(tx(cuts[cuts.length-1].x),ty(cuts[cuts.length-1].y),"#ff0000","END",-12);',
+            '      drawDot(tx(cuts[0].rfx),ty(cuts[0].rfy),"#00ff00","START",12);',
+            '      drawDot(tx(cuts[cuts.length-1].rx),ty(cuts[cuts.length-1].ry),"#ff0000","END",-12);',
             '    }',
             '  }',
             '  if(animating&&currentStep>0){',
             '    const s=segments[currentStep-1];',
-            '    ctx.beginPath();ctx.arc(tx(s.x),ty(s.y),4,0,Math.PI*2);',
+            '    ctx.beginPath();ctx.arc(tx(s.rx),ty(s.ry),4,0,Math.PI*2);',
             '    ctx.fillStyle=s.type==="D"?"#00ffcc":"#ffdd00";ctx.fill();',
             '  }',
             '}',
             'function process(){',
             '  segments=parseHPGL(document.getElementById("hpglInput").value);',
             '  const cuts=segments.filter(m=>m.type==="D");',
-            '  let total=0;for(const m of cuts)total+=Math.hypot(m.x-m.fx,m.y-m.fy);',
+            '  let total=0;for(const m of cuts)total+=Math.hypot(m.rx-m.rfx, m.ry-m.rfy);',
             '  let mnX=Infinity,mnY=Infinity,mxX=-Infinity,mxY=-Infinity;',
-            '  for(const m of segments){mnX=Math.min(mnX,m.fx,m.x);mnY=Math.min(mnY,m.fy,m.y);',
-            '    mxX=Math.max(mxX,m.fx,m.x);mxY=Math.max(mxY,m.fy,m.y);}',
+            '  for(const m of segments){',
+            '    mnX=Math.min(mnX,m.rfx,m.rx);mnY=Math.min(mnY,m.rfy,m.ry);',
+            '    mxX=Math.max(mxX,m.rfx,m.rx);mxY=Math.max(mxY,m.rfy,m.ry);',
+            '  }',
             '  document.getElementById("stats").innerHTML=',
             '    "Commands: <span>"+segments.length+"</span> | "+',
             '    "Cut: <span>"+cuts.length+"</span> | "+',
-            '    "Size: <span>"+((mxX-mnX)/HPM).toFixed(1)+"x"+((mxY-mnY)/HPM).toFixed(1)+" mm</span> | "+',
+            '    "Rotated size: <span>"+((mxX-mnX)/HPM).toFixed(1)+"x"+((mxY-mnY)/HPM).toFixed(1)+" mm</span> | "+',
             '    "Length: <span>"+(total/HPM).toFixed(1)+" mm</span>";',
             '  currentStep=0;draw();',
             '}',
