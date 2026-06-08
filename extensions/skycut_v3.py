@@ -898,19 +898,27 @@ class SkyCutV3(inkex.EffectExtension):
               ctx.clearRect(0,0,W,H);
               if(!segments.length){ctx.fillStyle="#334455";ctx.font="12px monospace";
                 ctx.textAlign="center";ctx.fillText("PASTE HPGL -> RENDER",W/2,H/2);return;}
+              // Документен изглед: обратна трансформация на coord() от плъгина.
+              // coord: HPGL_x=(maxY-docY), HPGL_y=(maxX-docX)
+              // обратно: docX ∝ -HPGL_y, docY ∝ -HPGL_x
+              // екран: screen_x=docX=-hy, screen_y=docY=-hx (SVG Y надолу = екран Y надолу)
+              // Само визуализация — HPGL изходът към машината е непроменен.
               let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-              for(const s of segments){minX=Math.min(minX,s.fx,s.x);minY=Math.min(minY,s.fy,s.y);
-                maxX=Math.max(maxX,s.fx,s.x);maxY=Math.max(maxY,s.fy,s.y);}
+              for(const s of segments){
+                const ax=-s.fy, ay=-s.fx, bx=-s.y, by=-s.x;
+                minX=Math.min(minX,ax,bx);minY=Math.min(minY,ay,by);
+                maxX=Math.max(maxX,ax,bx);maxY=Math.max(maxY,ay,by);
+              }
               const dW=maxX-minX||1,dH=maxY-minY||1,pad=60;
               const baseScale=Math.min((W-pad*2)/dW,(H-pad*2)/dH);
               const scale=baseScale*userZoom;
               const offX=pad+(W-pad*2-dW*scale)/2+userPanX,offY=pad+(H-pad*2-dH*scale)/2+userPanY;
-              const tx=x=>offX+(x-minX)*scale,ty=y=>offY+(maxY-y)*scale;
+              // SX/SY: сурови hpgl координати → документен екранен изглед
+              const SX=(hx,hy)=>offX+((-hy)-minX)*scale;
+              const SY=(hx,hy)=>offY+((-hx)-minY)*scale;
               document.getElementById("scaleLine").style.width=(50*HPM*scale)+"px";
               document.getElementById("coords").innerHTML=
-                "X:"+minX+"-"+maxX+" ("+((maxX-minX)/HPM).toFixed(1)+"mm)<br>"+
-                "Y:"+minY+"-"+maxY+" ("+((maxY-minY)/HPM).toFixed(1)+"mm)<br>"+
-                "Zoom: "+userZoom.toFixed(1)+"x";
+                "Zoom: "+userZoom.toFixed(1)+"x  (изглед завъртян 90° CCW)";
               // limit: при анимация = currentStep; иначе = progress scrubber стойност
               const limit=animating?currentStep:progressLimit;
               if(document.getElementById("grid").checked){
@@ -922,29 +930,29 @@ class SkyCutV3(inkex.EffectExtension):
               if(document.getElementById("showTravel").checked){
                 ctx.strokeStyle="rgba(255,170,0,0.35)";ctx.lineWidth=0.8;ctx.setLineDash([4,4]);
                 for(let i=0;i<limit;i++)if(segments[i].type==="U"){
-                  ctx.beginPath();ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy));
-                  ctx.lineTo(tx(segments[i].x),ty(segments[i].y));ctx.stroke();}
+                  ctx.beginPath();ctx.moveTo(SX(segments[i].fx,segments[i].fy),SY(segments[i].fx,segments[i].fy));
+                  ctx.lineTo(SX(segments[i].x,segments[i].y),SY(segments[i].x,segments[i].y));ctx.stroke();}
                 ctx.setLineDash([]);
               }
               for(let i=0;i<limit;i++)if(segments[i].type==="D"){
                 ctx.strokeStyle="rgba(0,238,187,0.15)";ctx.lineWidth=4;
-                ctx.beginPath();ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy));
-                ctx.lineTo(tx(segments[i].x),ty(segments[i].y));ctx.stroke();
+                ctx.beginPath();ctx.moveTo(SX(segments[i].fx,segments[i].fy),SY(segments[i].fx,segments[i].fy));
+                ctx.lineTo(SX(segments[i].x,segments[i].y),SY(segments[i].x,segments[i].y));ctx.stroke();
                 ctx.strokeStyle="#00eebb";ctx.lineWidth=1.5;
-                ctx.beginPath();ctx.moveTo(tx(segments[i].fx),ty(segments[i].fy));
-                ctx.lineTo(tx(segments[i].x),ty(segments[i].y));ctx.stroke();
+                ctx.beginPath();ctx.moveTo(SX(segments[i].fx,segments[i].fy),SY(segments[i].fx,segments[i].fy));
+                ctx.lineTo(SX(segments[i].x,segments[i].y),SY(segments[i].x,segments[i].y));ctx.stroke();
               }
               if(document.getElementById("showPoints").checked){
                 const cuts=segments.filter(m=>m.type==="D");
                 if(cuts.length>0){
-                  drawDot(tx(cuts[0].fx),ty(cuts[0].fy),"#00ff00","START",12);
-                  drawDot(tx(cuts[cuts.length-1].x),ty(cuts[cuts.length-1].y),"#ff0000","END",-12);
+                  drawDot(SX(cuts[0].fx,cuts[0].fy),SY(cuts[0].fx,cuts[0].fy),"#00ff00","START",12);
+                  drawDot(SX(cuts[cuts.length-1].x,cuts[cuts.length-1].y),SY(cuts[cuts.length-1].x,cuts[cuts.length-1].y),"#ff0000","END",-12);
                 }
               }
               // Маркер на текущата позиция (анимация ИЛИ scrubber)
               if(limit>0&&limit<=segments.length){
                 const s=segments[limit-1];
-                ctx.beginPath();ctx.arc(tx(s.x),ty(s.y),4,0,Math.PI*2);
+                ctx.beginPath();ctx.arc(SX(s.x,s.y),SY(s.x,s.y),4,0,Math.PI*2);
                 ctx.fillStyle=s.type==="D"?"#00ffcc":"#ffdd00";ctx.fill();
               }
             }
