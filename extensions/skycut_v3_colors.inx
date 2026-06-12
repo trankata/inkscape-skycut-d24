@@ -90,6 +90,8 @@
              gui-text="Overcut (mm)">1.00</param>
       <param name="corner_sensitivity" type="int" min="0" max="100"
              gui-text="Чувствителност за ушички (0=малко, 100=много)">50</param>
+      <param name="rotate_seam" type="bool"
+             gui-text="Ротирай шева към права линия">true</param>
     </page>
 
     <page name="conn" gui-text="Връзка">

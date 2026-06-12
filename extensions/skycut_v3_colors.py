@@ -652,6 +652,7 @@ class SkyCutV3(inkex.EffectExtension):
         pars.add_argument("--knife_offset_mm", type=float,       default=0.25)
         pars.add_argument("--overcut_mm",    type=float,         default=1.00)
         pars.add_argument("--corner_sensitivity", type=int,      default=50)
+        pars.add_argument("--rotate_seam",   type=inkex.Boolean, default=True)
         # Цветови настройки: tool, force (0-160), speed (0-13), seq (1-4)
         pars.add_argument("--black_tool",  type=str, default="P0")
         pars.add_argument("--black_force", type=int, default=55)
@@ -846,7 +847,7 @@ class SkyCutV3(inkex.EffectExtension):
                 oc = ov_mm if is_p1 else 0.0
                 # Ротирай началото в средата на най-дълъг прав участък,
                 # за да паднат забиване/шев/overcut на гладка линия (не на дъга/ъгъл).
-                if is_p1:
+                if is_p1 and self.options.rotate_seam:
                     pts = rotate_to_longest_straight(pts)
                 body = open_closed_path(pts, 0.0)
                 if is_p1 and k_off > 0:
