@@ -34,6 +34,8 @@
          gui-text="Overcut — closed paths (mm)">1.00</param>
   <param name="corner_sensitivity" type="int" min="0" max="100"
          gui-text="Corner ear sensitivity (0=few, 100=many)">50</param>
+  <param name="rotate_seam" type="bool"
+         gui-text="Ротирай шева към права линия">true</param>
 
   <!-- ==================== OUTPUT &amp; CONNECTION ==================== -->
   <param name="save_hpgl"   type="bool"   gui-text="Save HPGL + open preview">false</param>

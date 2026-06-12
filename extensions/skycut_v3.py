@@ -15,6 +15,7 @@ from inkex import PathElement
 from inkex.paths import CubicSuperPath, ZoneClose
 import socket
 import math
+import re
 import tempfile
 import webbrowser
 from itertools import groupby
@@ -634,6 +635,7 @@ class SkyCutV3(inkex.EffectExtension):
         pars.add_argument("--knife_offset_mm", type=float,       default=0.25)
         pars.add_argument("--overcut_mm",    type=float,         default=1.00)
         pars.add_argument("--corner_sensitivity", type=int,      default=50)
+        pars.add_argument("--rotate_seam",   type=inkex.Boolean, default=True)
         pars.add_argument("--save_hpgl",     type=inkex.Boolean, default=False)
         pars.add_argument("--output_path",   type=str,           default="skycut_v3_output.hpgl")
         pars.add_argument("--debug",         type=inkex.Boolean, default=False)
@@ -796,7 +798,7 @@ class SkyCutV3(inkex.EffectExtension):
                 oc = ov_mm if is_p1 else 0.0
                 # Ротирай началото в средата на най-дълъг прав участък,
                 # за да паднат забиване/шев/overcut на гладка линия (не на дъга/ъгъл).
-                if is_p1:
+                if is_p1 and self.options.rotate_seam:
                     pts = rotate_to_longest_straight(pts)
                 body = open_closed_path(pts, 0.0)
                 if is_p1 and k_off > 0:
