@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <name>SkyCut D24 [v5 пунктир]</name>
+  <id>skycut.send.to.d24.v5</id>
+
+  <param name="help" type="description">
+    SkyCut D24 v4 — обединен плъгин.
+    Пътищата трябва да са в слой "Cut". Маркери в слой "Mark".
+    Режим "Режи по цветове" (в таб Цветове): когато е изключен, реже с
+    единичен натиск (настройки от машината, black=P0, друго=P1).
+    Когато е включен, всеки цвят има свой инструмент/натиск/скорост/ред.
+  </param>
+
+  <param name="tab" type="notebook">
+    <page name="basic" gui-text="Основни">
+      <param name="use_markers" type="bool" gui-text="Регистрационни маркери">false</param>
+      <param name="paper_size" type="optiongroup" gui-text="Размер на медията">
+        <option value="a4p">A4 Portrait (210 x 297 mm)</option>
+        <option value="a4l">A4 Landscape (297 x 210 mm)</option>
+        <option value="a3p">A3 Portrait (297 x 420 mm)</option>
+        <option value="a3l">A3 Landscape (420 x 297 mm)</option>
+      </param>
+      <param name="auto_nesting" type="bool" gui-text="Авто-засичане на острови">true</param>
+      <param name="nesting_order" type="optiongroup" gui-text="Ред в острова">
+        <option value="inside_first">Отвътре навън</option>
+        <option value="outside_first">Отвън навътре</option>
+      </param>
+      <param name="knife_offset_mm" type="float" min="0.0" max="1.0" precision="2"
+             gui-text="Knife offset (mm)">0.30</param>
+      <param name="overcut_mm" type="float" min="0.0" max="3.0" precision="2"
+             gui-text="Overcut (mm)">1.00</param>
+      <param name="corner_sensitivity" type="int" min="0" max="100"
+             gui-text="Чувствителност за ушички (0=малко, 100=много)">50</param>
+      <param name="rotate_seam" type="bool"
+             gui-text="Ротирай шева към права линия">true</param>
+    </page>
+
+    <page name="colors" gui-text="Цветове">
+      <param name="use_colors" type="bool"
+             gui-text="Режи по цветове (различен натиск/скорост за всеки цвят)">false</param>
+      <separator/>
+      <hbox>
+        <vbox>
+          <label appearance="header">Пунктир / Цвят</label>
+          <param name="black_dashed"  type="bool" gui-text="Черен">false</param>
+          <param name="green_dashed"  type="bool" gui-text="Зелен">false</param>
+          <param name="yellow_dashed" type="bool" gui-text="Жълт">false</param>
+          <param name="red_dashed"    type="bool" gui-text="Червен">false</param>
+        </vbox>
+        <separator/>
+        <vbox>
+          <label appearance="header">Инструмент</label>
+          <param name="black_tool" type="optiongroup" appearance="combo" gui-text="">
+            <option value="P0">P0</option>
+            <option value="P1">P1</option>
+          </param>
+          <param name="green_tool" type="optiongroup" appearance="combo" gui-text="">
+            <option value="P1">P1</option>
+            <option value="P0">P0</option>
+          </param>
+          <param name="yellow_tool" type="optiongroup" appearance="combo" gui-text="">
+            <option value="P1">P1</option>
+            <option value="P0">P0</option>
+          </param>
+          <param name="red_tool" type="optiongroup" appearance="combo" gui-text="">
+            <option value="P1">P1</option>
+            <option value="P0">P0</option>
+          </param>
+        </vbox>
+        <separator/>
+        <vbox>
+          <label appearance="header">Натиск</label>
+          <param name="black_force"  type="int" min="0" max="160" gui-text="">55</param>
+          <param name="green_force"  type="int" min="0" max="160" gui-text="">25</param>
+          <param name="yellow_force" type="int" min="0" max="160" gui-text="">25</param>
+          <param name="red_force"    type="int" min="0" max="160" gui-text="">52</param>
+        </vbox>
+        <separator/>
+        <vbox>
+          <label appearance="header">Скорост</label>
+          <param name="black_speed"  type="int" min="0" max="13" gui-text="">7</param>
+          <param name="green_speed"  type="int" min="0" max="13" gui-text="">7</param>
+          <param name="yellow_speed" type="int" min="0" max="13" gui-text="">7</param>
+          <param name="red_speed"    type="int" min="0" max="13" gui-text="">7</param>
+        </vbox>
+        <separator/>
+        <vbox>
+          <label appearance="header">Ред</label>
+          <param name="black_seq"  type="int" min="1" max="4" gui-text="">1</param>
+          <param name="green_seq"  type="int" min="1" max="4" gui-text="">2</param>
+          <param name="yellow_seq" type="int" min="1" max="4" gui-text="">3</param>
+          <param name="red_seq"    type="int" min="1" max="4" gui-text="">4</param>
+        </vbox>
+      </hbox>
+      <separator/>
+      <label appearance="header">Настройки за пунктир (за тикнатите цветове)</label>
+      <hbox>
+        <vbox>
+          <param name="dash_len" type="float" min="0.1" max="50.0" precision="1"
+                 gui-text="Дължина на щрих (mm)">3.0</param>
+          <param name="gap_len" type="float" min="0.1" max="50.0" precision="1"
+                 gui-text="Дължина на пауза (mm)">2.0</param>
+          <param name="travel_speed" type="int" min="1" max="650"
+                 gui-text="Travel speed (US)">350</param>
+        </vbox>
+        <separator/>
+        <vbox>
+          <param name="use_dash_force" type="bool" gui-text="Отделен натиск за щрих">true</param>
+          <param name="dash_force" type="int" min="0" max="160" gui-text="  Натиск щрих">40</param>
+          <param name="use_gap_force" type="bool" gui-text="Отделен натиск за пауза">true</param>
+          <param name="gap_force" type="int" min="0" max="160" gui-text="  Натиск пауза">5</param>
+          <param name="cut_quickly" type="bool"
+                 gui-text="Cut quickly (ножът остава долу)">false</param>
+        </vbox>
+      </hbox>
+    </page>
+
+    <page name="conn" gui-text="Връзка">
+      <param name="save_hpgl"   type="bool"   gui-text="Запази HPGL + преглед">false</param>
+      <param name="output_path" type="string" gui-text="Път за изход">skycut_v5_output.hpgl</param>
+      <param name="ip"   type="string" gui-text="IP адрес">192.168.0.233</param>
+      <param name="port" type="int" min="1" max="65535" gui-text="Порт">8080</param>
+      <param name="debug" type="bool" gui-text="Debug режим">false</param>
+    </page>
+  </param>
+
+  <effect needs-live-preview="false">
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu name="SkyCutD24 Tools"/>
+    </effects-menu>
+  </effect>
+
+  <script>
+    <command reldir="extensions" interpreter="python">skycut_v5.py</command>
+  </script>
+</inkscape-extension>
