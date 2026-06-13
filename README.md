@@ -8,11 +8,17 @@ These Inkscape extensions send cutting jobs directly to a **SkyCut D24** plotter
 
 ## 📦 Extensions
 
-**SkyCut D24 [v3]** — main cutting plugin
-For boxes, packaging and general shapes cut with a single pressure (settings configured on the machine).
+**SkyCut D24 [v5]** — the main, all-in-one plugin
 
-**SkyCut D24 [v3 colors]** — per-color cutting plugin
-For print-and-cut labels. Each color gets its own tool, force (FS) and speed (VS), allowing kiss-cut and through-cut in a single job with one marker registration.
+A single plugin that covers the full workflow:
+
+- **Single-pressure mode** (default) — cuts everything with one pressure set on the machine. Black = creasing (P0), other colors = cutting (P1). Ideal for boxes, packaging and general shapes.
+- **Cut-by-color mode** (toggle in the *Main* tab) — each color gets its own tool, force (FS) and speed (VS), allowing kiss-cut and through-cut in a single job with one marker registration. Ideal for print-and-cut labels.
+- **Dashed-line cutting** — any color can be set to cut as a perforation (dash/gap), with adjustable dash and gap force. With *Cut quickly* the blade stays down and only alternates pressure; without it the blade lifts in the gaps.
+
+A Bulgarian (`skycut_v5`) and an English (`skycut_v5_eng`) build are provided — they are functionally identical, only the menu language differs.
+
+> Earlier single-purpose plugins (`v3`, `v3 colors`, `v4`) are kept in the repo for reference, but **v5 supersedes them all**.
 
 ---
 
@@ -22,14 +28,14 @@ For print-and-cut labels. Each color gets its own tool, force (FS) and speed (VS
 - Knife-offset compensation with corner arcs on sharp angles
 - Overcut overlap at the seam
 - Smart sharp-corner vs. rounded-curve detection (based on turn concentration)
-- Start point rotated onto a straight segment to hide the seam
+- Optional start-point rotation onto a straight segment to hide the seam (toggle)
 - Nesting with island detection and route optimization (nearest-neighbor + 2-opt)
 - Adjustable corner-ear sensitivity
+- Per-color force/speed control for kiss-cut + through-cut in one job
+- **Dashed-line / perforation cutting**, with separate dash & gap force and a *Cut quickly* option
 - L-shaped registration markers (layer `Mark`)
-- Per-color force/speed control for kiss-cut + through-cut in one job (colors plugin)
 - Direct HP-GL output via TCP/IP (Wi-Fi)
 - Built-in HTML viewer: document-oriented view, zoom/pan, progress scrubber, cut animation
-- Color-based workflow: creasing (P0) and cutting (P1)
 - Optional HP-GL file export for debugging
 - Works on Linux, and should also work on macOS (Wi-Fi only)
 
@@ -38,11 +44,13 @@ For print-and-cut labels. Each color gets its own tool, force (FS) and speed (VS
 ## 🎨 Workflow
 
 1. Create your design in a layer named **`Cut`**
-2. (Optional) Place markers in a layer named **`Mark`**
-3. Run **Extensions → SkyCutD24 Tools → Corner Markers**
-4. Run **Extensions → SkyCutD24 Tools → SkyCut D24 [v3]** (single pressure)
-   — or **SkyCut D24 [v3 colors]** for labels with per-color force/speed
-5. The plotter cuts your design
+2. (Optional) Place registration markers in a layer named **`Mark`**
+3. Run **Extensions → SkyCutD24 Tools → SkyCut D24 [v5]**
+4. In the **Main** tab, choose the mode:
+   - leave *Cut by color* **off** for single-pressure cutting (machine settings), or
+   - turn it **on** and set tool / force / speed / order (and optional dashed) per color in the **Colors** tab
+5. Set the connection (IP / port) in the **Connection** tab, or enable *Save HP-GL + preview* to export instead of cutting
+6. The plotter cuts your design
 
 ---
 
@@ -52,7 +60,20 @@ For print-and-cut labels. Each color gets its own tool, force (FS) and speed (VS
 - **Other colors** → Inner cuts (P1)
 - **Red** → Outer contour (P1) → executed last
 
-In the colors plugin, four colors (black, green, yellow, red) each have an independent tool, force, speed and cutting order. Only the colors present in the document are cut.
+In cut-by-color mode, four colors (black, green, yellow, red) each have an independent tool, force, speed, cutting order, and an optional dashed (perforation) setting. Only the colors present in the document are cut.
+
+---
+
+## 🔪 Dashed-line cutting (perforation)
+
+Set any color's **Dashed** option to *Yes* in the Colors tab, then configure the shared dashed settings:
+
+- **Dash length** / **Gap length** (mm)
+- **Dash force** / **Gap force** (optional — when off, the base color force is used)
+- **Cut quickly** — when **on**, the blade stays down and only the pressure alternates (faster, gaps lightly scored); when **off**, the blade lifts in the gaps (clean breaks)
+- **Travel speed** (US) — used only in dashed mode
+
+This produces shapes that hold in place while cutting but tear away easily by hand.
 
 ---
 
@@ -72,15 +93,23 @@ In the colors plugin, four colors (black, green, yellow, red) each have an indep
    - **Windows:** `%APPDATA%\Inkscape\extensions\`
    - **Mac:** `~/Library/Application Support/org.inkscape.Inkscape/config/inkscape/extensions/`
 2. Restart Inkscape
-3. Run the extensions from **Extensions → SkyCutD24 Tools**
+3. Run the extension from **Extensions → SkyCutD24 Tools**
+
+(Install `skycut_v5_eng.py` + `.inx` for the English menu, or `skycut_v5.py` + `.inx` for Bulgarian. Both can be installed at once — they appear as separate entries.)
 
 ---
 
 ## 💡 Optional HP-GL Export
 
-- Enable **"Save HP-GL"** in the extension options
+- Enable **"Save HP-GL + preview"** in the **Connection** tab
 - Specify a file path
 - The extension saves the HP-GL commands and an HTML preview instead of sending them to the plotter
+
+---
+
+## 📡 Command reference
+
+See [`COMMANDS.md`](COMMANDS.md) for the reverse-engineered HP-GL / CMD command reference and a guide for adapting the plugin to other setups.
 
 ---
 
