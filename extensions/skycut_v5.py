@@ -802,11 +802,11 @@ class SkyCutV5(inkex.EffectExtension):
         pars.add_argument("--red_force", type=int, default=52)
         pars.add_argument("--red_speed", type=int, default=7)
         pars.add_argument("--red_seq",   type=int, default=4)
-        # Пунктир (dashed) — тикче per цвят
-        pars.add_argument("--black_dashed",  type=inkex.Boolean, default=False)
-        pars.add_argument("--green_dashed",  type=inkex.Boolean, default=False)
-        pars.add_argument("--yellow_dashed", type=inkex.Boolean, default=False)
-        pars.add_argument("--red_dashed",    type=inkex.Boolean, default=False)
+        # Пунктир (dashed) — dropdown per цвят: "yes"/"no"
+        pars.add_argument("--black_dashed",  type=str, default="no")
+        pars.add_argument("--green_dashed",  type=str, default="no")
+        pars.add_argument("--yellow_dashed", type=str, default="no")
+        pars.add_argument("--red_dashed",    type=str, default="no")
         # Общи настройки за пунктир
         pars.add_argument("--dash_len",    type=float,         default=3.0)
         pars.add_argument("--gap_len",     type=float,         default=2.0)
@@ -883,16 +883,16 @@ class SkyCutV5(inkex.EffectExtension):
             color_settings = {
                 'black':  {'tool': o.black_tool,  'force': o.black_force,
                            'speed': o.black_speed, 'seq': o.black_seq,
-                           'dashed': o.black_dashed},
+                           'dashed': o.black_dashed == "yes"},
                 'green':  {'tool': o.green_tool,  'force': o.green_force,
                            'speed': o.green_speed, 'seq': o.green_seq,
-                           'dashed': o.green_dashed},
+                           'dashed': o.green_dashed == "yes"},
                 'yellow': {'tool': o.yellow_tool, 'force': o.yellow_force,
                            'speed': o.yellow_speed, 'seq': o.yellow_seq,
-                           'dashed': o.yellow_dashed},
+                           'dashed': o.yellow_dashed == "yes"},
                 'red':    {'tool': o.red_tool,    'force': o.red_force,
                            'speed': o.red_speed,   'seq': o.red_seq,
-                           'dashed': o.red_dashed},
+                           'dashed': o.red_dashed == "yes"},
             }
         else:
             color_settings = None   # прост режим: black=P0, друго=P1

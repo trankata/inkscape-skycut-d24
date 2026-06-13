@@ -33,19 +33,24 @@
              gui-text="Чувствителност за ушички (0=малко, 100=много)">50</param>
       <param name="rotate_seam" type="bool"
              gui-text="Ротирай шева към права линия">true</param>
+      <separator/>
+      <param name="use_colors" type="bool"
+             gui-text="Режи по цветове (различен натиск/скорост за всеки цвят)">false</param>
+      <label>↳ Настройките за всеки цвят са в таб „Цветове"</label>
     </page>
 
     <page name="colors" gui-text="Цветове">
-      <param name="use_colors" type="bool"
-             gui-text="Режи по цветове (различен натиск/скорост за всеки цвят)">false</param>
-      <separator/>
       <hbox>
         <vbox>
-          <label appearance="header">Пунктир / Цвят</label>
-          <param name="black_dashed"  type="bool" gui-text="Черен">false</param>
-          <param name="green_dashed"  type="bool" gui-text="Зелен">false</param>
-          <param name="yellow_dashed" type="bool" gui-text="Жълт">false</param>
-          <param name="red_dashed"    type="bool" gui-text="Червен">false</param>
+          <label appearance="header">Цвят</label>
+          <spacer size="4"/>
+          <label>Черен</label>
+          <spacer size="8"/>
+          <label>Зелен</label>
+          <spacer size="8"/>
+          <label>Жълт</label>
+          <spacer size="8"/>
+          <label>Червен</label>
         </vbox>
         <separator/>
         <vbox>
@@ -91,9 +96,29 @@
           <param name="yellow_seq" type="int" min="1" max="4" gui-text="">3</param>
           <param name="red_seq"    type="int" min="1" max="4" gui-text="">4</param>
         </vbox>
+        <separator/>
+        <vbox>
+          <label appearance="header">Пунктир</label>
+          <param name="black_dashed" type="optiongroup" appearance="combo" gui-text="">
+            <option value="no">Не</option>
+            <option value="yes">Да</option>
+          </param>
+          <param name="green_dashed" type="optiongroup" appearance="combo" gui-text="">
+            <option value="no">Не</option>
+            <option value="yes">Да</option>
+          </param>
+          <param name="yellow_dashed" type="optiongroup" appearance="combo" gui-text="">
+            <option value="no">Не</option>
+            <option value="yes">Да</option>
+          </param>
+          <param name="red_dashed" type="optiongroup" appearance="combo" gui-text="">
+            <option value="no">Не</option>
+            <option value="yes">Да</option>
+          </param>
+        </vbox>
       </hbox>
       <separator/>
-      <label appearance="header">Настройки за пунктир (за тикнатите цветове)</label>
+      <label appearance="header">Настройки за пунктир (за цветовете с "Да")</label>
       <hbox>
         <vbox>
           <param name="dash_len" type="float" min="0.1" max="50.0" precision="1"
