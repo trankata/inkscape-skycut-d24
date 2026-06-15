@@ -22,6 +22,24 @@ A Bulgarian (`skycut_v5`) and an English (`skycut_v5_eng`) build are provided �
 
 ---
 
+## 🖥️ The interface
+
+The plugin has three tabs.
+
+**Main** — choose the mode (single-pressure or cut-by-color), markers, media size, nesting, knife offset, overcut, corner-ear sensitivity and seam rotation.
+
+![Main tab](images/Main.png)
+
+**Colors** — per-color tool, force, speed, cutting order, and an optional dashed (perforation) setting, plus the shared dashed-line settings.
+
+![Colors tab](images/Colors.png)
+
+**Connection** — plotter IP / port, or save the HP-GL to a file with an HTML preview instead of cutting.
+
+![Connection tab](images/Connection.png)
+
+---
+
 ## ✨ Features
 
 - Automatic opening of closed contours (the firmware works only with open paths)
