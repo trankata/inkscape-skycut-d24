@@ -40,6 +40,14 @@ The plugin has three tabs.
 
 ---
 
+## 👁️ Built-in HP-GL viewer
+
+When *Save HP-GL + preview* is enabled, the plugin opens an HTML viewer in your browser. It shows the cut paths in document orientation, with zoom/pan, a progress scrubber, and a step-by-step cut **animation** so you can preview the exact cutting order before sending the job.
+
+![Viewer animation](images/viewer.gif)
+
+---
+
 ## ✨ Features
 
 - Automatic opening of closed contours (the firmware works only with open paths)
