@@ -77,6 +77,28 @@ python3 install_buttons.py
 Then **fully restart Inkscape** (close all windows). Two buttons appear at the
 right end of the command toolbar: **SkyCut** and **Corner Markers**.
 
+### Quick install from a clone
+
+If you don't keep the repo locally, you can clone it, run the installer, and
+delete the clone afterwards. The installer copies everything it needs into your
+user profile (`~/.config/inkscape` and `~/.local/share/icons`), so the clone is
+not required to stay:
+
+```bash
+git clone https://github.com/trankata/inkscape-skycut-d24.git
+cd inkscape-skycut-d24/toolbar-buttons-install
+python3 install_buttons.py
+cd ../..
+rm -rf inkscape-skycut-d24
+```
+
+Then **fully restart Inkscape**.
+
+> ℹ️ This only sets up the toolbar buttons. The buttons are shortcuts to the
+> extensions, so make sure the extensions themselves are installed first (see
+> [Installation](#️-installation)). If you delete the clone, copy the extension
+> files before removing it.
+
 ### Options
 
 ```bash
