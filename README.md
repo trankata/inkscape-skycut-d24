@@ -62,6 +62,7 @@ When *Save HP-GL + preview* is enabled, the plugin opens an HTML viewer in your 
 - L-shaped registration markers (layer `Mark`)
 - Direct HP-GL output via TCP/IP (Wi-Fi)
 - Built-in HTML viewer: document-oriented view, zoom/pan, progress scrubber, cut animation
+- Optional toolbar buttons for one-click access (see below)
 - Optional HP-GL file export for debugging
 - Works on Linux, and should also work on macOS (Wi-Fi only)
 
@@ -122,6 +123,86 @@ This produces shapes that hold in place while cutting but tear away easily by ha
 3. Run the extension from **Extensions → SkyCutD24 Tools**
 
 (Install `skycut_v5_eng.py` + `.inx` for the English menu, or `skycut_v5.py` + `.inx` for Bulgarian. Both can be installed at once — they appear as separate entries.)
+
+---
+
+## 🔘 Optional: Toolbar Buttons
+
+If you'd rather launch the tools with one click instead of opening the
+**Extensions** menu, you can add buttons directly to Inkscape's command toolbar
+(the top bar with New / Open / Save).
+
+A small installer in `toolbar-buttons-install/` automates this. It takes the
+stock `toolbar-commands.ui` from your machine, injects the buttons into it, and
+installs the matching icons — so it keeps working across Inkscape versions
+instead of shipping a fixed toolbar file.
+
+### Install
+
+```bash
+cd toolbar-buttons-install
+python3 install_buttons.py
+```
+
+Then **fully restart Inkscape** (close all windows). The buttons appear at the
+right end of the command toolbar.
+
+### Quick install from a clone
+
+If you don't keep the repo locally, you can clone it, run the installer, and
+delete the clone afterwards. The installer copies everything it needs into your
+user profile (`~/.config/inkscape` and `~/.local/share/icons`), so the clone is
+not required to stay:
+
+```bash
+git clone https://github.com/trankata/inkscape-skycut-d24.git
+cd inkscape-skycut-d24/toolbar-buttons-install
+python3 install_buttons.py
+cd ../..
+rm -rf inkscape-skycut-d24
+```
+
+Then **fully restart Inkscape**.
+
+> ℹ️ This only sets up the toolbar buttons. The buttons are shortcuts to the
+> extensions, so make sure the extensions themselves are installed first (see
+> **Installation** above). If you delete the clone, copy the extension files
+> before removing it.
+
+### Options
+
+```bash
+python3 install_buttons.py --reset      # rebuild from a clean toolbar, then inject
+python3 install_buttons.py --uninstall  # remove the buttons and icons again
+```
+
+Re-running the plain install is safe — existing buttons are detected and skipped.
+Use `--reset` if your toolbar ever gets out of sync (for example after upgrading
+Inkscape, or if a button was added twice).
+
+### Customizing / adding more buttons
+
+Open `install_buttons.py` and edit the `BUTTONS` list near the top. Each entry
+needs the action name (the **ID** shown in *Edit → Preferences → Interface →
+Keyboard*), an icon name, a label and a tooltip:
+
+```python
+{
+    "id":        "skycut_btn",
+    "action":    "app.skycut.send.to.d24.v5.eng",
+    "icon":      "skycut-cut",
+    "icon_file": "skycut-cut.svg",
+    "label":     "SkyCut",
+    "tooltip":   "Open the SkyCut D24 plugin",
+},
+```
+
+Put the matching SVG icon in `toolbar-buttons-install/icons/`. Icons should be a
+clean 16×16 SVG (square, `viewBox="0 0 16 16"`, visible color).
+
+> ⚠️ **Icon names must be unique.** A generic `icon-name` such as `markers`
+> collides with a built-in Inkscape icon and the built-in one wins, so your icon
+> won't show. Always prefix it, e.g. `skycut-…` or `corner-…`.
 
 ---
 
