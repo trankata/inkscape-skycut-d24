@@ -128,8 +128,7 @@ This produces shapes that hold in place while cutting but tear away easily by ha
 
 ## 🔘 Optional: Toolbar Buttons
 
-![Main tab](images/buttons.png)
-
+![Toolbar buttons](images/buttons.png)
 
 If you'd rather launch the tools with one click instead of opening the
 **Extensions** menu, you can add buttons directly to Inkscape's command toolbar
