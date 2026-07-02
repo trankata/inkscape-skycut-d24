@@ -529,22 +529,6 @@ def _stroke_to_color(elem):
     return "red"
 
 
-def _path_is_closed(abs_path):
-    segs = list(abs_path)
-    if any(isinstance(seg, ZoneClose) for seg in segs):
-        return True
-    if len(segs) >= 2:
-        try:
-            def _pt(seg):
-                return (seg.end.x, seg.end.y) if hasattr(seg, 'end') else None
-            p0 = _pt(segs[0]); p1 = _pt(segs[-1])
-            if p0 and p1 and math.hypot(p1[0]-p0[0], p1[1]-p0[1]) < 0.01:
-                return True
-        except Exception:
-            pass
-    return False
-
-
 def _simple_tool(elem):
     """Simple mode (like v3): black->P0 (crease), others->P1 (cut)."""
     color = _stroke_to_color(elem)
@@ -567,6 +551,7 @@ def process_elements(cut_layer, color_settings, scale_x=1.0, scale_y=1.0):
             tool, seq = _simple_tool(elem)
             force = speed = None
             color = None
+            dashed = False
         else:
             color = _stroke_to_color(elem)
             cfg   = color_settings.get(color, color_settings['red'])
@@ -575,8 +560,6 @@ def process_elements(cut_layer, color_settings, scale_x=1.0, scale_y=1.0):
             force = cfg['force']
             speed = cfg['speed']
             dashed = cfg.get('dashed', False)
-        if color_settings is None:
-            dashed = False
 
         abs_path = elem.path.to_absolute()
         composed = elem.composed_transform()
@@ -585,7 +568,7 @@ def process_elements(cut_layer, color_settings, scale_x=1.0, scale_y=1.0):
         elif elem.transform:
             abs_path = abs_path.transform(elem.transform)
 
-        is_closed_svg = _path_is_closed(abs_path)
+        has_zone_close = any(isinstance(s, ZoneClose) for s in abs_path)
         csp = CubicSuperPath(abs_path)
 
         for subpath in csp:
@@ -608,6 +591,11 @@ def process_elements(cut_layer, color_settings, scale_x=1.0, scale_y=1.0):
             if has_curve:
                 pts = resample_by_length(pts, CURVE_STEP_MM)
 
+            # Determine closure: ZoneClose in path, or start/end proximity
+            sp_closed = has_zone_close
+            if not sp_closed and len(pts) >= 2:
+                sp_closed = math.hypot(pts[-1][0]-pts[0][0], pts[-1][1]-pts[0][1]) < 0.01
+
             if pts:
                 path_data.append({
                     'pts':       pts,
@@ -616,7 +604,7 @@ def process_elements(cut_layer, color_settings, scale_x=1.0, scale_y=1.0):
                     'force':     force,
                     'speed':     speed,
                     'priority':  seq,
-                    'is_closed': is_closed_svg,
+                    'is_closed': sp_closed,
                     'has_curve': has_curve,
                     'dashed':    dashed,
                 })
@@ -818,7 +806,7 @@ class SkyCutV5Eng(inkex.EffectExtension):
         pars.add_argument("--cut_quickly", type=inkex.Boolean, default=False)
         pars.add_argument("--travel_speed", type=int,          default=350)
         pars.add_argument("--save_hpgl",     type=inkex.Boolean, default=False)
-        pars.add_argument("--output_path",   type=str,           default="skycut_v3_output.hpgl")
+        pars.add_argument("--output_path",   type=str,           default="skycut_v5_eng_output.hpgl")
         pars.add_argument("--debug",         type=inkex.Boolean, default=False)
 
     def effect(self):
@@ -1055,7 +1043,7 @@ class SkyCutV5Eng(inkex.EffectExtension):
 
     def _build_viewer_html(self, hpgl_data):
         import textwrap
-        hpgl_escaped = hpgl_data.replace('\\', '\\\\').replace('`', '\\`')
+        hpgl_escaped = hpgl_data.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${')
         css = textwrap.dedent("""
             * { box-sizing: border-box; }
             body { margin:0; padding:10px; background:#0a0f1a; color:#c8d8e8;
@@ -1246,7 +1234,7 @@ class SkyCutV5Eng(inkex.EffectExtension):
 
         return f"""<!DOCTYPE html>
 <html lang="en"><head><meta charset="UTF-8">
-<title>HPGL Viewer SkyCut v3</title>
+<title>HPGL Viewer SkyCut v5</title>
 <style>{css}</style></head><body>
 <h3 style="margin:0;color:#00eebb;font-size:14px">HPGL Viewer - SkyCut v5</h3>
 <textarea id="hpglInput"></textarea>
